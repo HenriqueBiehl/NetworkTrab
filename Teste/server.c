@@ -70,36 +70,48 @@ void setar_modo_promiscuo(int sckt, char *netInterface){
     }
 }
 
+
+void copiar_frame_buffer(char *buffer, struct networkFrame frame){ 
+
+    buffer[0] = frame.start; 
+    buffer[1] = (frame.size) << 2 | frame.seq >> 3;
+    printf("%hhx e %hhx = ", frame.size, frame.seq);
+    printf("%hhx\n", buffer[1]);
+    buffer[2] = frame.seq << 2 | frame.type; 
+    printf("%hhx e %hhx = ", frame.seq, frame.type);
+    printf("%hhx\n", buffer[2]);
+    memcpy(buffer+16, frame.data, MAX_DATA_LENGHT);
+    buffer[67] = frame.crc8;
+}
+
 int main(){
 
     int sckt = cria_raw_socket();
-    char buffer[FRAME_SIZE];
+    struct networkFrame message;
+    char msg[MAX_DATA_LENGHT];
+    char pack[FRAME_SIZE];
 
     bind_raw_socket(sckt, "lo");
     setar_modo_promiscuo(sckt, "lo");
 
     printf("sckt: %d\n", sckt);
 
-    //struct networkFrame message; 
-
     while(1){
-        int ret = recvfrom(sckt, buffer, FRAME_SIZE, 0, NULL, NULL);
+        int ret = recvfrom(sckt, pack, FRAME_SIZE, 0, NULL, NULL);
         if (ret < 0) {
             perror("Erro ao receber mensagem");
             close(sckt);
             return -1;
         }
-        else{
-            printf("got it pal\n");
-            if(strlen(buffer) > 0){
-                printf("There is something in the buffer\n");
-                printf("%s\n", buffer);
-                printf("Buffer has %ld bytes written on it \n", strlen(buffer));
-            }
-            else{
-                printf("Nothing here mate\n");
-            }
-        }
+        printf("got it pal\n");
+        printf("%d bytes read. I shouldve got %d\n", ret, FRAME_SIZE);
+        for(int i=0; i < FRAME_SIZE; ++i)
+            printf("%hhx ", pack[i]);
+        // printf("    size: %d\n", transmission.size);
+        // printf("    sequency: %d\n", transmission.seq);
+        // printf("    type: %d\n", transmission.type);
+        // printf("    data: %s\n", transmission.data);
+        // printf("    crc8: %d\n", transmission.crc8);
     }
 
     close(sckt);

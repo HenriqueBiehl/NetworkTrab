@@ -9,12 +9,13 @@
 #include <stdint.h>
 
 #define MAX_DATA_LENGHT 63
+#define FRAME_SIZE 67
 
 struct networkFrame {
     uint8_t start; 
-    uint8_t size:6;
-    uint8_t seq:5;
-    uint8_t type:5;
+    uint8_t size;
+    uint8_t seq;
+    uint8_t type;
     unsigned char data[MAX_DATA_LENGHT];  
     uint8_t crc8;
 };
@@ -69,13 +70,29 @@ void setar_modo_promiscuo(int sckt, char *netInterface){
     }
 }
 
+void copiar_frame_buffer(char *buffer, struct networkFrame frame){ 
+
+    buffer[0] = frame.start; 
+    buffer[1] = (frame.size & 0x3F) << 2 | (frame.seq >> 3);
+    printf("%hhx e %hhx = ", frame.size, frame.seq);
+    printf("%hhx\n", buffer[1]);
+    buffer[2] = (frame.seq & 0x07) << 5 | (frame.type & 0x1F); 
+    printf("%hhx e %hhx = ", frame.seq, frame.type);
+    printf("%hhx\n", buffer[2]);
+    for(int i = 3; i <= MAX_DATA_LENGHT + 3; ++i)
+        buffer[i] = frame.data[i-3];
+    buffer[67] = frame.crc8;
+}
+
 int main(){
 
     int sckt = cria_raw_socket();
     struct sockaddr_ll server_addr; 
     char msg[MAX_DATA_LENGHT] = "AvO9AQdHSWyos9XfCBghO4Vy9mzR6RzAvO9AQdHSWyos9XfCBrghO4Vy9mzR6R";
+    char transmission[FRAME_SIZE];
 
     bind_raw_socket(sckt, "lo");
+    setar_modo_promiscuo(sckt, "lo");
 
     printf("sckt: %d\n", sckt);
 
@@ -88,18 +105,33 @@ int main(){
     message.seq    = 1; 
     message.crc8   = 255;
 
+    printf("%hhx ", message.start);
+    printf("%hhx ", message.size);
+    printf("%hhx ", message.seq); 
+    printf("%hhx ", message.type);
+    for(int i=0; i < MAX_DATA_LENGHT; ++i)
+        printf("%hhx ", message.data[i]);
+    printf("%hhx ", message.crc8); 
+
+    copiar_frame_buffer(transmission, message);
+    printf("Transmission in hex: \n");
+    printf("%s\n", transmission);
+    for(int i=0; i < FRAME_SIZE; ++i)
+        printf("%hhx ", transmission[i]);
+    printf("\n");
+
     //Procedimento para poder enviar informações
     int ifindex = if_nametoindex("lo");
     server_addr.sll_ifindex = ifindex;
     server_addr.sll_family = AF_PACKET;
     
-    int ret = sendto(sckt, (struct networkFrame*) &message,sizeof(struct networkFrame), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    int ret = sendto(sckt, transmission, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if(ret < 0){
         fprintf(stderr, "Falha ao fazer sendto()");
         return -1;
     }
     else{
-        printf("deu buenas kkk\n");
+        printf("deu buenas kkk\nEnviei %d bytes\n", ret);
     }
 
     close(sckt);
