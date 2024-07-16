@@ -1,0 +1,35 @@
+#include <stdio.h>
+#include <stdlib.h> 
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h> 
+#include <net/ethernet.h> 
+#include <linux/if_packet.h> 
+#include <net/if.h> 
+#include <stdint.h>
+
+#define MAX_DATA_LENGHT 63
+#define FRAME_SIZE 67
+
+#define ACK 0
+#define NACK 1
+#define LISTA 10 
+#define BAIXAR 11
+#define MOSTRA_NA_TELA 16
+#define DESCRITOR_ARQUIVO 17
+#define DADOS 18
+#define FIM_TX 30
+#define ERRO 31
+
+struct __attribute__((packed)) networkFrame {
+        uint8_t start; 
+        uint8_t size:6;
+        uint8_t seq:5;
+        uint8_t type:5;
+        unsigned char data[MAX_DATA_LENGHT];  
+        uint8_t crc8;
+};
+
+void printBinary(uint8_t n);
+
+void printFrame(struct networkFrame frame);

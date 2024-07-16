@@ -1,12 +1,12 @@
-CFLAGS= -std=c2x -Wall -g
+CFLAGS = -std=c2x -Wall -g
 
-OBJECTS=client server 
+OBJECTS = client server 
 
-client: client.c server
-	gcc client.c -o client $(CFLAGS)
+client: network.c client.c server
+	gcc network.c client.c -o client $(CFLAGS)
 
-server: server.c 
-	gcc server.c -o server $(CFLAGS)
+server: network.c server.c 
+	gcc network.c server.c -o server $(CFLAGS)
 
 clean:
 	rm -rf $(OBJECTS)
