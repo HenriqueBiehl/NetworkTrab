@@ -98,6 +98,13 @@ int main(){
 
                 memcpy(&message, pack, FRAME_SIZE);
                 printFrame(message);
+                
+                if (verifica_crc8((uint8_t*)&message, sizeof(message) - 1, message.crc8)) {
+                        printf("crc deu boinas\n");
+                }
+                else {
+                        printf("num deu o crc\n");
+                }
 
                 //for(int i=0; i < FRAME_SIZE; ++i)
                 //        printf("%hhx ", pack[i]);

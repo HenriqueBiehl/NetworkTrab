@@ -33,3 +33,7 @@ struct __attribute__((packed)) networkFrame {
 void printBinary(uint8_t n);
 
 void printFrame(struct networkFrame frame);
+
+uint8_t calcula_crc8(uint8_t *data, size_t len);
+
+int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido);

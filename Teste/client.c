@@ -93,7 +93,8 @@ int main(){
         message.seq    = 1; 
         message.type   = MOSTRA_NA_TELA; //Só pra testar
         memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        message.crc8   = 255;
+        //message.crc8   = 255;
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
 
         //printf("%hhx ", message.start);
         //printf("%hhx ", message.size);

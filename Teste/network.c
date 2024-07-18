@@ -26,5 +26,27 @@ void printFrame(struct networkFrame frame) {
         for(int i=0; i < MAX_DATA_LENGHT; ++i)
                 printf("%c ", frame.data[i]);
         printf("\n");
-        printf("CRC: %u ", frame.crc8); 
+        printf("CRC: %u ", frame.crc8);
+}
+
+uint8_t calcula_crc8(uint8_t *data, size_t len) {
+    uint8_t crc = 0x00;
+    uint8_t polynomial = 0x07; // Polinômio padrão do CRC-8: x^8 + x^2 + x + 1
+
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (uint8_t j = 0; j < 8; j++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ polynomial;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido) {
+    uint8_t crc_calculado = calcula_crc8(data, len);
+    return (crc_calculado == crc_recebido);
 }
