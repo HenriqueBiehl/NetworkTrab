@@ -37,3 +37,14 @@ void printFrame(struct networkFrame frame);
 uint8_t calcula_crc8(uint8_t *data, size_t len);
 
 int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido);
+
+/*
+        Lista os conteúdos de um diretório e envia para um arquivo temporário "lista"         
+*/
+void lista_conteudos();
+
+/*
+        Insere os dados de tamanho e data do arquivo "nome arquivo" 
+        em um arquivo temporário "descritor"
+*/
+void descritor_arquivo(char *nomeArquivo);

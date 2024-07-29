@@ -50,3 +50,31 @@ int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido) {
     uint8_t crc_calculado = calcula_crc8(data, len);
     return (crc_calculado == crc_recebido);
 }
+
+FILE *abrir_arquivo(char *nome, char *tipo)
+{
+	FILE *arq; 
+	
+	arq = fopen(nome, tipo); 
+
+	if(!arq) {
+		printf("%s ", nome);
+		perror("Erro ao abrir o arquivo  \n");
+		return NULL;
+	}
+
+	return arq;
+}
+
+
+void lista_conteudos(){
+    system("ls *.mp4 *.avi > lista");
+}
+
+void descritor_arquivo(char *nomeArquivo){
+    char buf[1024];
+    sprintf(buf, "ls -l %s > t1", nomeArquivo);
+    system(buf);
+    system("cut -d' ' -f5,6,7,8 t1 > descritor");
+    system("rm t1");
+}
