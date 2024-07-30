@@ -7,8 +7,13 @@
 #include <linux/if_packet.h> 
 #include <net/if.h> 
 #include <stdint.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <limits.h>
 
 #include "network.h"
+
 
 /*
    Cria um socket do tipo:
@@ -61,6 +66,40 @@ void setar_modo_promiscuo(int sckt, char *netInterface){
 }
 
 
+FILE *listar_no_buffer() {
+        FILE *fp;
+        //char cmd[64] = sprintf("ls %s", DIR_CONTEUDOS);
+        fp = popen("ls conteudos", "r");
+        if (fp == NULL) {
+                perror("popen");
+                exit(EXIT_FAILURE);
+        }
+        return fp;
+}
+
+struct networkFrame gerar_mensagem_enviar_nome(char *nome, uint8_t seq) {
+
+        struct networkFrame message;
+        message.start = START;
+        message.size = strlen(nome);
+        message.seq = seq;
+        message.type = LISTA;
+        memcpy(&message.data, nome, message.size);
+        
+        return message;
+}
+
+struct networkFrame gerar_mensagem_fim_tx(uint8_t seq) {
+
+        struct networkFrame message;
+        message.start = START;
+        message.size = MAX_DATA_LENGHT;
+        message.seq = seq;
+        message.type = FIM_TX;
+        //memcpy(&message.data, nome, message.size);
+        return message;
+}
+
 void copiar_frame_buffer(char *buffer, struct networkFrame frame){ 
 
         buffer[0] = frame.start; 
@@ -74,45 +113,84 @@ void copiar_frame_buffer(char *buffer, struct networkFrame frame){
         buffer[67] = frame.crc8;
 }
 
+
 int main(){
 
         int sckt = cria_raw_socket();
         struct networkFrame message;
-        char msg[MAX_DATA_LENGHT];
+        //char msg[MAX_DATA_LENGHT];
         char pack[FRAME_SIZE];
 
         bind_raw_socket(sckt, "lo");
         setar_modo_promiscuo(sckt, "lo");
 
         printf("sckt: %d\n", sckt);
+        
+        struct sockaddr_ll client_addr;
+        socklen_t addr_len = sizeof(struct sockaddr_in);
 
-        while(1){
-                int ret = recvfrom(sckt, pack, FRAME_SIZE, 0, NULL, NULL);
+        //int ret = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+        int ret;
+        while(1) {
+                ret = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
                 if (ret < 0) {
                         perror("Erro ao receber mensagem");
                         close(sckt);
                         return -1;
+                } else {
+                        printf("Received packet from %s:\n", client_addr.sll_addr);
+                        //exit(1);
                 }
-                printf("got it pal\n");
-                printf("%d bytes read. I shouldve got %d\n", ret, FRAME_SIZE);
-
+                //printf("got it pal\n");
+                //printf("%d bytes read. I shouldve got %d\n", ret, FRAME_SIZE);
                 memcpy(&message, pack, FRAME_SIZE);
-                printFrame(message);
-                
+                //printf("Type = %u\n", message.type);
+                //printFrame(message);
+                switch(message.type) {
+                        case(ACK):
+                                printf("ACK, esperando proxima mensagem\n");
+                                break;
+                        case(MOSTRA_NA_TELA):
+                                printf("Mostrar na tela\n");
+                                break;
+                        case(LISTA):
+                                printf("LISTA\n");
+                                char msg[FRAME_SIZE];
+                                //int ifindex = if_nametoindex("lo");
+                                FILE *buffer_lista = listar_no_buffer();
+
+                                char line[256];
+                                int i = 0;
+                                while (fgets(line, sizeof(line), buffer_lista)) {
+                                        struct networkFrame mensagem_atual = gerar_mensagem_enviar_nome(line, i++);
+                                        memcpy(msg, &mensagem_atual, FRAME_SIZE);
+                                        int ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                        if(ret < 0){
+                                                fprintf(stderr, "Falha ao fazer sendto()");
+                                                return -1;
+                                        }
+                                        //printf("%s", line);
+                                } 
+                                struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
+                                printf("enviando fim da tx\n");
+                                memcpy(msg, &mensagem_fim_tx, FRAME_SIZE);
+                                int ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                if(ret < 0){
+                                        fprintf(stderr, "Falha ao fazer sendto()");
+                                        return -1;
+                                }
+
+                                exit (0); // Exit se nao buga e crasha...
+                                //printFrame(mensagem);
+                                break;
+                }
+
                 if (verifica_crc8((uint8_t*)&message, sizeof(message) - 1, message.crc8)) {
                         printf("crc deu boinas\n");
                 }
                 else {
                         printf("num deu o crc\n");
                 }
-
-                //for(int i=0; i < FRAME_SIZE; ++i)
-                //        printf("%hhx ", pack[i]);
-                // printf("    size: %d\n", transmission.size);
-                // printf("    sequency: %d\n", transmission.seq);
-                // printf("    type: %d\n", transmission.type);
-                // printf("    data: %s\n", transmission.data);
-                // printf("    crc8: %d\n", transmission.crc8);
         }
 
         close(sckt);

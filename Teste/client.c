@@ -73,11 +73,44 @@ void copiar_frame_buffer(char *buffer, struct networkFrame frame){
         buffer[67] = frame.crc8;
 }
 
+// recebe um do tipo lista e imprime na tela o nome do arquivo recebido
+void receber_mensagem_lista(struct networkFrame frame) {
+        printf("%s", frame.data);
+}
+
+struct networkFrame gerar_mensagem_lista(uint8_t seq) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = 63;
+        message.seq    = seq; 
+        message.type   = LISTA; //Só pra testar
+        char msg[MAX_DATA_LENGHT] = "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL";
+        memcpy(&message.data, msg, MAX_DATA_LENGHT);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+}
+
+struct networkFrame gerar_mensagem_ack(uint8_t seq) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = 63;
+        message.seq    = seq; 
+        message.type   = ACK; //Só pra testar
+        char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        memcpy(&message.data, msg, MAX_DATA_LENGHT);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+}
+
 int main(){
 
         int sckt = cria_raw_socket();
         struct sockaddr_ll server_addr; 
-        char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        //char msg[MAX_DATA_LENGHT] = "000000000000000000000000000000000000000000000000000000000000000";
         char transmission[FRAME_SIZE];
 
         bind_raw_socket(sckt, "lo");
@@ -86,81 +119,86 @@ int main(){
         printf("sckt: %d\n", sckt);
 
         struct networkFrame message; 
-        struct networkFrame message_copy; 
-
-        message.start  = 0x7e;
-        message.size   = 63;
-        message.seq    = 1; 
-        message.type   = MOSTRA_NA_TELA; //Só pra testar
-        memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        //message.crc8   = 255;
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
-
-        //printf("%hhx ", message.start);
-        //printf("%hhx ", message.size);
-        //printf("%hhx ", message.seq); 
-        //printf("%hhx ", message.type);
-        //for(int i=0; i < MAX_DATA_LENGHT; ++i)
-        //    printf("%hhx ", message.data[i]);
-        //printf("%hhx ", message.crc8); 
-
-        printf("Tamanho da struct networkFrame = %lu\n", sizeof(struct networkFrame));
-
-        printBinary(message.start);
-        printf("%u ", message.size);
-        printf("\n");
-        printf("%u ", message.seq); 
-        printf("\n");
-        printf("%u ", message.type);
-        printf("\n");
-        for(int i=0; i < MAX_DATA_LENGHT; ++i)
-                printf("%c ", message.data[i]);
-        printf("\n");
-        printf("%u ", message.crc8); 
-
 
         memcpy(transmission, &message, FRAME_SIZE);
-        memcpy(&message_copy, transmission, FRAME_SIZE);
-
-        printf("COPIA:\n\n");
-
-        printBinary(message_copy.start);
-        printf("%u ", message_copy.size);
-        printf("\n");
-        printf("%u ", message_copy.seq); 
-        printf("\n");
-        printf("%u ", message_copy.type);
-        printf("\n");
-        for(int i=0; i < MAX_DATA_LENGHT; ++i)
-                printf("%c ", message_copy.data[i]);
-        printf("\n");
-        printf("%u ", message_copy.crc8); 
-
-
-
-
-
-        //copiar_frame_buffer(transmission, message);
-        printf("Transmission in hex: \n");
-        printf("%s\n", transmission);
-        for(int i=0; i < FRAME_SIZE; ++i)
-            printf("%hhx ", transmission[i]);
-        printf("\n");
 
         //Procedimento para poder enviar informações
         int ifindex = if_nametoindex("lo");
         server_addr.sll_ifindex = ifindex;
         server_addr.sll_family = AF_PACKET;
-        
-        int ret = sendto(sckt, transmission, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-        if(ret < 0){
-            fprintf(stderr, "Falha ao fazer sendto()");
-            return -1;
-        }
-        else{
-            printf("deu buenas kkk\nEnviei %d bytes\n", ret);
-        }
 
+        int seq = 0;
+
+        printf("Envie uma mensagem ao servidor (listar, baixar \"arquivo\"):\n");
+        while (1) {
+                printf("Esperando comando: ");
+                char input[128];
+                scanf("%s", input);
+                //printf("%s", input);
+                if (strncmp(input, "listar", 6) == 0) {
+                        printf("Listando diretorio:\n");
+                        message = gerar_mensagem_lista(seq++);
+                        int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                        if (ret < 0) {
+                                fprintf(stderr, "Falha ao fazer sendto()");
+                                return -1;
+                        } else {
+                                printf("Mensagem enviada, aguardando servidor\n");
+                        }
+                        // Enviar a mensagem para listar
+                } else if (strncmp(input, "baixar", 6) == 0) {
+                        // Enviar a mensagem para baixar
+                        exit(0);
+                } else if (strcmp(input, "exit") == 0) {
+                        exit(0);
+                } else {
+                        printf("Comando inexistente.\n");
+                        exit(0);
+                }
+
+                char pack[FRAME_SIZE];
+                socklen_t add_len = sizeof(struct sockaddr_in);
+
+                int rec = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                if (rec < 0) {
+                        perror("Erro ao receber mensagem");
+                        close(sckt);
+                        return -1;
+                }
+
+                struct networkFrame recieved;
+                memcpy(&recieved, pack, FRAME_SIZE);
+
+                switch (recieved.type) {
+                        case (LISTA):
+                                while (recieved.type != FIM_TX) {
+                                        receber_mensagem_lista(recieved);
+                                        rec = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                                        if (rec < 0) {
+                                                perror("Erro ao receber mensagem");
+                                                close(sckt);
+                                                return -1;
+                                        }
+                                        memcpy(&recieved, pack, FRAME_SIZE);
+                                }
+
+                                printf("Fim da transmissao, listado o diretorio\n");
+                                printf("enviando ACK\n");
+
+                                //printFrame(recieved);
+                                message = gerar_mensagem_ack(seq++);
+                                int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                                if (ret < 0) {
+                                        fprintf(stderr, "Falha ao fazer sendto()");
+                                        return -1;
+                                } else {
+                                        printFrame(message);
+                                        printf("Ack enviado");
+                                }
+
+                                break;
+                }
+        }
         close(sckt);
         return 1;
 }

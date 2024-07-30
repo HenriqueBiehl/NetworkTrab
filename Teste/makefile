@@ -1,4 +1,4 @@
-CFLAGS = -std=c2x -Wall -g
+CFLAGS = -std=gnu17 -Wall -g -Wno-packed-bitfield-compat
 
 OBJECTS = client server 
 

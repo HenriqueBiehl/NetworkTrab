@@ -11,6 +11,8 @@
 #define MAX_DATA_LENGHT 63
 #define FRAME_SIZE 67
 
+#define START 0x7e
+
 #define ACK 0
 #define NACK 1
 #define LISTA 10 
@@ -20,6 +22,8 @@
 #define DADOS 18
 #define FIM_TX 30
 #define ERRO 31
+
+#define DIR_CONTEUDOS "conteudos"
 
 struct __attribute__((packed)) networkFrame {
         uint8_t start; 
