@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+#include "lib_cards.h"
+
+
 #define PORT_BASE 5000
 #define BUF_SIZE 256
 #define NUM_NODES 4
@@ -11,16 +14,18 @@
 #define TOKEN_SIZE 64
 #define FRAME_SIZE 2055
 
+
 #define START 0x7e
 #define SHUFFLE_FLAG 0 
 #define BET_FLAG 1
 #define MATCH_FLAG 2 
 #define RESULTS_FLAG 3
 #define MAX_ROUNDS 9
+#define TAM_BARALHO 40
 
 struct message_frame{
     uint8_t start;                        //Bits de inicio transmissão
-    unsigned int size;                         //Define o tamanho do campo *data
+    unsigned int size;                    //Define o tamanho do campo *data
     uint8_t flag;                         //Flags que definem o "momento do jogo" (embaralhamento, aposta, partida, resultados)
     uint8_t round;                        //Determina em qual rodada está o jogo 
     char data[MAX_DATA_LENGHT+1];         //Campo de dados onde são enviados os dados da partida 
@@ -72,6 +77,8 @@ int main(int argc, char *argv[]){
     char buffer[TOKEN_SIZE+1];
     char data_buffer[MAX_DATA_LENGHT+1];
     char pack[FRAME_SIZE];
+    unsigned int *baralho;
+    struct carta_t *mao;
 
 
     memset(buffer, 0, TOKEN_SIZE+1);
@@ -100,10 +107,16 @@ int main(int argc, char *argv[]){
     if(index == 0){
         inicializa_frame(&message);
         strcpy(buffer, token);
+        baralho = malloc(TAM_BARALHO*sizeof(unsigned int));
+        mao = malloc(5*sizeof(struct carta_t));
+        memset(baralho, 0, TAM_BARALHO);
+        gera_cartas_aleatorias(mao, baralho, 5);
     }
 
     while(1){
-        printf("No while\n");            
+
+
+
         if(strcmp(buffer, token) == 0){
             printf("TOKEN: %s\n", buffer); 
             char pick[10];
