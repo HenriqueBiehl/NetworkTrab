@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-
+#include <time.h>
 #include "lib_cards.h"
 
 
@@ -51,7 +51,7 @@ int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
     return 1;
 }
 
-void setar_proximo_nodo(struct sockaddr_in *node, unsigned int index){
+void setar_nodo(struct sockaddr_in *node, unsigned int index){
     memset(node, 0, sizeof(*node));
     node->sin_family = AF_INET;
     node->sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // Para simplicidade, usando loopback
@@ -66,13 +66,33 @@ void inicializa_frame(struct message_frame *frame){
     memset(frame->data, 0, MAX_DATA_LENGHT+1);
 }
 
-void preparar_mensagem(struct message_frame *frame, char *data){
+void preparar_mensagem(struct message_frame *frame, char *data, unsigned int size, int flag, int round){
     frame->start = START;
-    frame->size  = MAX_DATA_LENGHT+1;
+    frame->size  = size;
     frame->flag  = SHUFFLE_FLAG;
     frame->round = 0;
-    memcpy(frame->data, data, MAX_DATA_LENGHT+1);
+    memset(frame->data, 0, MAX_DATA_LENGHT+1);
+    memcpy(frame->data, data, size+1);
 }
+
+
+void mao_baralho(struct carta_t *c, int n, unsigned int *size, char *str){
+    int msg_index = 0;
+    struct carta_t x; 
+
+    for(int i =0; i < n; ++i){
+        x = c[i];
+        str[msg_index] = converte_numero_baralho(x.num); 
+        str[msg_index+1] = '/';
+        str[msg_index+2] = converte_numero_naipe(x.naipe);
+        str[msg_index+3] = '|';
+        msg_index += 4;
+    }
+
+    *size = msg_index;
+    str[msg_index] = '\0';
+}
+
 
 struct token_ring incializa_token(){
     struct token_ring t;
@@ -83,7 +103,34 @@ struct token_ring incializa_token(){
     return t;
 }
 
-void embaralhar_cartas();
+int enviar_cartas(unsigned int *baralho, int dest_index, int sock){
+    struct sockaddr_in to_addr;
+    struct message_frame cards; 
+    int env;
+
+    setar_nodo(&to_addr, dest_index);
+
+    struct carta_t *mao;
+
+    mao = malloc(5*sizeof(struct carta_t));
+    gera_cartas_aleatorias(mao, baralho, 5);
+
+
+    cards.start = START;
+    cards.flag  = SHUFFLE_FLAG;
+    cards.round = 0;
+    memset(cards.data, 0, MAX_DATA_LENGHT+1);
+
+    mao_baralho(mao, 5, &cards.size, cards.data);
+    printf("%s\n", cards.data);
+    cards.size++;
+    
+    env =  sendto(sock, (char*)&cards, FRAME_SIZE, 0, (struct sockaddr*)&to_addr, sizeof(to_addr));
+    if(env < 0) 
+        perror("Falha ao fazer sendto()\n");
+
+    return 1;
+}
 
 int main(int argc, char *argv[]){
     int sock, index; 
@@ -116,27 +163,29 @@ int main(int argc, char *argv[]){
         perror("Falha no bind do socket\n");
     
     printf("Socket para %d: %d\n", index, sock);
-    setar_proximo_nodo(&next_node_addr, next_node_index);
+    setar_nodo(&next_node_addr, next_node_index);
 
     socklen_t addr_size;
-    //int opt; 
     int env; 
 
     if(index == 0){
         inicializa_frame(&message);
         strcpy(node_token.token, token);
-        baralho = malloc(TAM_BARALHO*sizeof(unsigned int));
+        baralho = malloc(sizeof(unsigned int)*TAM_BARALHO);
         mao = malloc(5*sizeof(struct carta_t));
-        memset(baralho, 0, TAM_BARALHO);
+        memset(baralho, 0, TAM_BARALHO*sizeof(unsigned int));
         gera_cartas_aleatorias(mao, baralho, 5);
     }
 
     while(1){
-
         if(node_token.start == START){
             if(strcmp(node_token.token, token) == 0){
                 printf("TOKEN: %s\n", node_token.token); 
-                char pick[10];
+                if(index == 0){
+                    for(int i=0; i < NUM_NODES; ++i)
+                        enviar_cartas(baralho, i, sock);                
+                }
+                /*char pick[10];
                 memset(pick, 0, 10);
                 char card;
                 char house;  
@@ -149,7 +198,7 @@ int main(int argc, char *argv[]){
                 printf("Done\n");
                 snprintf(pick, 10,"%d:%c/%c|",index,card,house);
                 strcpy(data_buffer, strcat(message.data,pick));
-                preparar_mensagem(&message, data_buffer);
+                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, 0,0);*/
 
                 env =  sendto(sock, (char*)&message, FRAME_SIZE, 0, (struct sockaddr*)&next_node_addr, sizeof(next_node_addr));
                 if(env < 0) 
