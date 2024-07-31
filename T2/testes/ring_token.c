@@ -9,14 +9,21 @@
 #define NUM_NODES 4
 #define MAX_DATA_LENGHT 2048
 #define TOKEN_SIZE 64
+#define FRAME_SIZE 2055
+
+#define START 0x7e
+#define SHUFFLE_FLAG 0 
+#define BET_FLAG 1
+#define MATCH_FLAG 2 
+#define RESULTS_FLAG 3
+#define MAX_ROUNDS 9
 
 struct message_frame{
-    unsigned int start;  
-    unsigned int size; 
-    char gato[4];
-    unsigned int apostas[4];
-    unsigned int vidas[4];
-    unsigned char data[2048]; 
+    uint8_t start;                        //Bits de inicio transmissão
+    unsigned int size;                         //Define o tamanho do campo *data
+    uint8_t flag;                         //Flags que definem o "momento do jogo" (embaralhamento, aposta, partida, resultados)
+    uint8_t round;                        //Determina em qual rodada está o jogo 
+    char data[MAX_DATA_LENGHT+1];         //Campo de dados onde são enviados os dados da partida 
 };
 
 
@@ -39,12 +46,36 @@ void setar_proximo_nodo(struct sockaddr_in *node, unsigned int index){
     node->sin_port = htons(PORT_BASE + index);
 }
 
+void inicializa_frame(struct message_frame *frame){
+    frame->start = START;
+    frame->size  = MAX_DATA_LENGHT+1;
+    frame->flag  = SHUFFLE_FLAG;
+    frame->round = 0;
+    memset(frame->data, 0, MAX_DATA_LENGHT+1);
+}
+
+void preparar_mensagem(struct message_frame *frame, char *data){
+    frame->start = START;
+    frame->size  = MAX_DATA_LENGHT+1;
+    frame->flag  = SHUFFLE_FLAG;
+    frame->round = 0;
+    memcpy(frame->data, data, MAX_DATA_LENGHT+1);
+}
+
 int main(int argc, char *argv[]){
     int sock, index; 
     struct sockaddr_in my_addr, next_node_addr, from_addr;   
+    
+    struct message_frame message; 
+    
     char token[TOKEN_SIZE+1];
     char buffer[TOKEN_SIZE+1];
+    char data_buffer[MAX_DATA_LENGHT+1];
+    char pack[FRAME_SIZE];
+
+
     memset(buffer, 0, TOKEN_SIZE+1);
+    memset(buffer, 0, MAX_DATA_LENGHT+1);
     snprintf(token, TOKEN_SIZE+1,"3SAwABfnXZAPSr9zIjoWtA4rcJNRcZjSSYlLnBcSKwpthrOc9Tv7xNrIYrxzcqi6");
 
 
@@ -63,45 +94,71 @@ int main(int argc, char *argv[]){
     setar_proximo_nodo(&next_node_addr, next_node_index);
 
     socklen_t addr_size;
-    int opt; 
+    //int opt; 
     int env; 
 
+    if(index == 0){
+        inicializa_frame(&message);
+        strcpy(buffer, token);
+    }
+
     while(1){
-        printf("No while\n");
-        env = recvfrom(sock, buffer, TOKEN_SIZE+1, 0, (struct sockaddr*)&from_addr, &addr_size);
-        printf("%d\n", env);
-        if(env < 0)
-            perror("Falha ao fazer recvfrom()\n");
-            
-        if(strcmp(buffer, token) == 1){
-            printf("Escolha a opção:\n[1] - Finalizar \n[2]- Transmitir\n[3] - Receber\n");
-            scanf("%d", &opt);
-        
-            if(opt == 1)
-                break; 
-        
-            if(opt == 2){
-                printf("Transmitindo de %d para %d\n", index, next_node_index);
-                snprintf(buffer, BUF_SIZE,"Bastão de %d\n", index);
-                env =  sendto(sock, buffer, strlen(buffer) + 1, 0, (struct sockaddr*)&next_node_addr, sizeof(next_node_addr));
-                if(env < 0) 
-                    perror("Falha ao fazer sendto()\n");
-            }   
+        printf("No while\n");            
+        if(strcmp(buffer, token) == 0){
+            printf("TOKEN: %s\n", buffer); 
+            char pick[10];
+            memset(pick, 0, 10);
+            char card;
+            char house;  
 
-            if(opt == 3){
-                printf("Recebendo bastão em %d\n", index);
-                addr_size = sizeof(from_addr);
-                int str_len = recvfrom(sock, buffer, BUF_SIZE, 0, (struct sockaddr*)&from_addr, &addr_size);
-                if (str_len < 0)
-                    printf("Nothing received in %d\n", index);
-                else 
-                    printf("MENSAGEM: %s\n", buffer);  
-            }
+            printf("Escolha uma casa e um número:\n");
+            scanf(" %c",&card);
+            getchar(); 
+            scanf(" %c",&house);
+            getchar(); 
+            printf("Done\n");
+            snprintf(pick, 10,"%d:%c/%c|",index,card,house);
+            strcpy(data_buffer, strcat(message.data,pick));
+            preparar_mensagem(&message, data_buffer);
 
-             sendto(sock, buffer, TOKEN_SIZE+1, 0, (struct sockaddr*)&next_node_addr, sizeof(next_node_addr));
+            env =  sendto(sock, (char*)&message, FRAME_SIZE, 0, (struct sockaddr*)&next_node_addr, sizeof(next_node_addr));
+            if(env < 0) 
+                perror("Falha ao fazer sendto()\n");
+
+            printf("Transmitindo de %d para %d\n", index, next_node_index);
+            env =  sendto(sock, buffer, strlen(buffer) + 1, 0, (struct sockaddr*)&next_node_addr, sizeof(next_node_addr));
+            if(env < 0) 
+                perror("Falha ao fazer sendto()\n");
         }
-         
+
+        addr_size = sizeof(from_addr);
+        env = recvfrom(sock, pack, FRAME_SIZE, 0, (struct sockaddr*)&from_addr, &addr_size);
+        memcpy(&message, pack, FRAME_SIZE);
+        if (env < 0)
+            printf("Nothing received in %d\n", index);
+        else 
+            printf("Bytes lidos: %d\nMessage: %s\n", index, message.data);
+
+        env = recvfrom(sock, buffer, TOKEN_SIZE+1, 0, (struct sockaddr*)&from_addr, &addr_size);
+        if (env < 0)
+            printf("Nothing received in %d\n", index);
+        else 
+            printf("Recebendo bastão em %d\nBytes lidos: %d\n", index,env);
     }
 
     close(sock);
 }
+
+  // printf("Escolha a opção:\n[1] - Finalizar \n[2] - Segredo \n[3] - :D\n");
+            // scanf("%d", &opt);
+        
+            // if(opt == 1)
+            //     break; 
+        
+            // if(opt == 2){
+            //     printf("Make his fight on the hill in the early day\n");
+            // }   
+
+            // if(opt == 3){
+            //     printf("Constant chills deep inside *DRUM SOUND*\n");
+            // }
