@@ -17,6 +17,10 @@ struct carta_t carta_aleatoria(unsigned int *baralho){
     return c;
 }
 
+void marcar_carta_usada(struct carta_t *c){
+    c->num = USADA;
+}
+
 void gera_cartas_aleatorias(struct carta_t *v, unsigned int *baralho, unsigned int n){
 
     for(int i=0; i < n; ++i){
@@ -27,8 +31,10 @@ void gera_cartas_aleatorias(struct carta_t *v, unsigned int *baralho, unsigned i
 void print_deck(struct carta_t *v, unsigned int n){
 
     for(int i=0; i < n; ++i){
-        printf("%c de %c\n", converte_numero_baralho(v[i].num), converte_numero_naipe(v[i].naipe));
+        if(v[i].num != 10)
+            printf("[%d] - %c de %c| ", i+1, converte_numero_baralho(v[i].num), converte_numero_naipe(v[i].naipe));
     }
+    printf("\n");
 }
 
 char converte_numero_baralho(unsigned int i){

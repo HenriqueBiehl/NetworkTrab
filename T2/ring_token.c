@@ -22,6 +22,7 @@
 #define BET_FLAG 1
 #define MATCH_FLAG 2 
 #define RESULTS_FLAG 3
+#define ALL_BETS 4
 
 #define MAX_ROUNDS 9
 #define TAM_BARALHO 40
@@ -40,7 +41,6 @@ struct token_ring{
     uint8_t start;                        //Bits de inicio transmissão
     char token[TOKEN_SIZE+1];
 };
-    struct sockaddr_in to_addr; //Estrutura para endereçamento do destino
 
 int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
     memset(addr, 0, sizeof(*addr));
@@ -110,7 +110,7 @@ struct token_ring incializa_token(){
 }
 
 struct message_frame seta_mensagem_shuffle(unsigned int *baralho, int dest_index, uint8_t round, int n){
-    struct message_frame cards; //Frame com as cartas a serem enviades
+    struct message_frame cards; //Frame com as cartas a serem enviadas
 
     struct carta_t *deck; //Vetor que representará a 'mão' de cartas 
 
@@ -160,10 +160,7 @@ void converte_apostas(char *data, unsigned int n, uint8_t *a, unsigned int k){
         a[index] = converte_char_int(data[i]);
         index++;
     }
-
-
 }
-
 
 int apostar(int round){
     int a, ok = 0; 
@@ -184,6 +181,24 @@ int apostar(int round){
     return a;
 }
 
+int escolhe_cartas(struct carta_t *v, int n){
+    int c, ok = 0; 
+
+    printf("Escolha sua carta:");
+    scanf("%d",&c);
+
+    while(!ok){
+        if((c-1 > 0 && c-1 < n) && v[c].num != USADA)
+            ok = 1;
+        else{
+            printf("ERRO: Carta Inválida. OTÀRIO\n");
+            scanf("%d",&c);
+        }
+    }
+
+    return c;
+}
+
 
 void receber_token(int sock, struct token_ring *node_token ,struct sockaddr_in from_addr, socklen_t addr_size){
     char token_buffer[TOKEN_RING_SIZE+1];
@@ -201,6 +216,7 @@ int main(int argc, char *argv[]){
     uint8_t MASTER_FLAG, dest;
     uint8_t *vidas; 
     uint8_t *apostas;
+    uint8_t *vitorias;
 
 
     struct message_frame message; 
@@ -255,6 +271,9 @@ int main(int argc, char *argv[]){
         apostas = malloc(sizeof(uint8_t)*NUM_NODES);
         memset(apostas, 0, NUM_NODES);
 
+        vitorias = malloc(sizeof(uint8_t)*NUM_NODES);
+        memset(apostas, 0, NUM_NODES);
+
 
         baralho = malloc(sizeof(unsigned int)*TAM_BARALHO);
         memset(baralho, 0, TAM_BARALHO*sizeof(unsigned int));
@@ -262,6 +281,8 @@ int main(int argc, char *argv[]){
 
     int aposta, round = 1; 
     dest = 0;
+    int n = 1;
+    struct carta_t carta;
     while(1){
 
         /* Sequência de operações para quando se tem o token*/
@@ -279,13 +300,13 @@ int main(int argc, char *argv[]){
                         case SHUFFLE_FLAG:
                             {
                                 if(dest == 0){
-                                    deck = malloc(9*sizeof(struct carta_t));
-                                    gera_cartas_aleatorias(deck, baralho, 9);
+                                    deck = malloc(n*sizeof(struct carta_t));
+                                    gera_cartas_aleatorias(deck, baralho, n);
                                 }
                                 dest++;
                                 
                                 if(dest < NUM_NODES)
-                                    message = seta_mensagem_shuffle(baralho, dest, round, 9);
+                                    message = seta_mensagem_shuffle(baralho, dest, round, n);
                                 
                                 printf("Preparado \n");
 
@@ -295,14 +316,39 @@ int main(int argc, char *argv[]){
                         case BET_FLAG:
                             {
                                 aposta = apostar(round);
-                                printf("Apostado ");
+                                printf("Apostado %d\n", aposta);
                                 memset(data_buffer, 0, MAX_DATA_LENGHT+1);
                                 snprintf(data_buffer, 3 ,"%c|", converte_int_char(aposta));
-                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, 1);
+                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, n);
                             }
                             break; 
+                        
+                        case ALL_BETS:
+                            {
+                                printf("    All bets case\n");
+                                message.flag = ALL_BETS; 
+                                message.dest = next_node_index; 
+                            }
+                            break;
                 
                         case MATCH_FLAG:
+                            {
+                                struct carta_t gato; 
+
+                                gato = carta_aleatoria(baralho);
+
+                                printf("*** HAND CARDS ***\n");
+                                print_deck(deck, n);
+                                printf("******************\n");
+
+                                printf("Escolha a carta:\n");
+                                opt = escolhe_cartas(deck, n);
+                                cart = v[opt]; 
+                                memset(data_buffer, 0, MAX_DATA_LENGHT+1);
+                                snprintf(data_buffer, 4 ,"%c%c@%c%c|", converte_int_char(gato.num), converte_int_char(gato.naipe), converte_int_char(carta.num),converte_int_char(carta.naipe));
+                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, MATCH_FLAG, round, n, 1);
+                                
+                            }
                             break; 
 
                         case RESULTS_FLAG:
@@ -313,12 +359,12 @@ int main(int argc, char *argv[]){
                 else{
                     switch(message.flag){
 
-                           case SHUFFLE_FLAG:
+                        case SHUFFLE_FLAG:
                             {
                                 if(message.dest == index){
                                     memset(data_buffer, 0, MAX_DATA_LENGHT+1);
                                     snprintf(data_buffer, 12 ,"RECEBIDO:%c\n", converte_int_char(index));
-                                    preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, SHUFFLE_FLAG, round, 9, 0);
+                                    preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, SHUFFLE_FLAG, round, 0, 1);
                                 }
                                 printf("Preparado \n");
                             }
@@ -328,25 +374,50 @@ int main(int argc, char *argv[]){
                             {
                                 char bet[3];
                                 aposta = apostar(round);
-                                printf("Apostado\n");
+                                printf("Apostado %d \n", aposta);
                                 memcpy(data_buffer, message.data, MAX_DATA_LENGHT+1);
                                 snprintf(bet, 3 ,"%c|", converte_int_char(aposta));
                                 strcat(data_buffer, bet);
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, next_node_index);
                             }
                             break; 
-                
-                        case MATCH_FLAG:
+
+                        case ALL_BETS:
+                            {
+                                message.dest = next_node_index;
+                            }
+                            break; 
+                        
+                        case MATCH_FLAG: 
+                            {
+                                char play[4];
+                                printf("*** HAND CARDS ***\n");
+                                print_deck(deck, n);
+                                printf("******************\n");
+
+                                printf("Escolha a carta:\n");
+                                opt = escolhe_cartas(deck, n);
+                                cart = v[opt]; 
+                                memcpy(data_buffer, message.data, MAX_DATA_LENGHT+1);
+                                snprintf(play, 4 ,"%c%c|", converte_int_char(carta.num),converte_int_char(carta.naipe));
+                                strcat(data_buffer, play);
+                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, MATCH_FLAG, round, n, next_node_index);
+                            }
                             break; 
 
                         case RESULTS_FLAG:
+                            {
+                                /*
+                                    3   - Monta a mensagem com os dados de resultado contendo:
+                                    3.1 - Resultado final da rodada
+                                    3.2 - Vencendor da rodada
+                                */  
+
+                            }
+
                             break;
 
                     }
-
-
-
-
                 }
 
                 /* Adicionar casos especiais de envio*/
@@ -393,7 +464,7 @@ int main(int argc, char *argv[]){
 
                 case SHUFFLE_FLAG: 
                     {                
-                        if(message.dest == 0){
+                        if(message.dest == 0 && index == 0){
                             printf("%s\n", message.data);
 
                             if(dest == 3){
@@ -413,21 +484,54 @@ int main(int argc, char *argv[]){
                     {
                         printf("Apostas da partida: %s\n", message.data);
                         
-                        if(message.dest == 0){
+                        if(message.dest == 0 && index == 0){
                             converte_apostas(message.data, message.size, apostas, 4);
 
                             for(int i=0; i < 4; ++i)
                                 printf("a[%d] = %d\n", i, apostas[i]);
 
+                            MASTER_FLAG = ALL_BETS;
+                        }
+                    }
+                    break; 
+
+                case ALL_BETS:
+                    {
+                        printf("Todas as Apostas:\n%s\n", message.data);
+
+                        if(message.dest == 0 && index == 0){
                             MASTER_FLAG = MATCH_FLAG;
                         }
                     }
                     break; 
-                
+
                 case MATCH_FLAG:
+                    {
+                        printf("*** MATCH ***\n");
+                        printf("%s\n", message.data);
+
+                        /*
+                            Verificar se o destino é 0. 
+                            Se for:
+                                1 - Computa o vetor e o resultado (incluindo salvar o vencedor da rodada)
+                                    1.1 - Utilizar do vetor vitorias
+                                2 - Muda a flag de MASTER para RESULTS_FLAG
+                        
+                        */
+
+
+                    }
+
                     break; 
 
-                case RESULTS_FLAG:
+                case RESULTS_FLAG:{
+                        /*
+                            Imprimir o Resultado
+                            1. Voltar para o estado de MATCH
+                            2. Computar os resultados finais
+                            2. Se ele finalizou a mao, voltar para o estado de SHUFFLE (usar variável ROUND_MAX) 
+                        */
+                    }
                     break;
                 
                 default:

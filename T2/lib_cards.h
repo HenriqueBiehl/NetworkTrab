@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#define USADA 10
+
 struct carta_t{
     unsigned int num;
     unsigned int naipe;
