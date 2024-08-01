@@ -181,7 +181,6 @@ void receber_token(int sock, struct token_ring *node_token ,struct sockaddr_in f
     if (recvfrom(sock, token_buffer, TOKEN_RING_SIZE, 0, (struct sockaddr*)&from_addr, &addr_size) < 0)
         perror("No token received\n");            
     memcpy(node_token, token_buffer, TOKEN_RING_SIZE);
-
 }
 
 
@@ -346,27 +345,9 @@ int main(int argc, char *argv[]){
                     break;
             }
 
-        }
-        
-        /* Recepção do token para passar para poder operar a trasmissão */
-        
+        }        
 
     }
-
-                    /*char pick[10];
-                memset(pick, 0, 10);
-                char card;
-                char house;  
-
-                printf("Escolha uma casa e um número:\n");
-                scanf(" %c",&card);
-                getchar(); 
-                scanf(" %c",&house);
-                getchar(); 
-                printf("Done\n");
-                snprintf(pick, 10,"%d:%c/%c|",index,card,house);
-                strcpy(data_buffer, strcat(message.data,pick));
-                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, 0,0);*/
        
     close(sock);
 }
