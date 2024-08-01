@@ -153,6 +153,18 @@ struct carta_t *vetor_cartas(char *data, unsigned int n, uint8_t num_cards){
     return v;
 } 
 
+void converte_apostas(char *data, unsigned int n, uint8_t *a, unsigned int k){
+    unsigned int index = 0;
+
+    for(int i=0; i < n && index < k; i+=2){
+        a[index] = converte_char_int(data[i]);
+        index++;
+    }
+
+
+}
+
+
 int apostar(int round){
     int a, ok = 0; 
 
@@ -160,12 +172,12 @@ int apostar(int round){
     scanf("%d",&a);
 
     while(!ok){
-        if(a <= round && a > 0){
+        if(a <= round && a >= 0){
             ok = 1;
         }
         else{
             printf("ERRO: Sua aposta deve estar entre 1 e %d\nAposte novamente:", round);
-            scanf("%d\n",&a);
+            scanf("%d",&a);
         }
     }
 
@@ -187,6 +199,10 @@ int main(int argc, char *argv[]){
     int sock, index; 
     struct sockaddr_in my_addr, next_node_addr, from_addr;   
     uint8_t MASTER_FLAG, dest;
+    uint8_t *vidas; 
+    uint8_t *apostas;
+
+
     struct message_frame message; 
     char data_buffer[MAX_DATA_LENGHT+1];
     char frame_buffer[FRAME_SIZE];
@@ -232,6 +248,14 @@ int main(int argc, char *argv[]){
         MASTER_FLAG = SHUFFLE_FLAG;    //Flag que só o indice 0 (o mestre do jogo) possui indicando o que ele deve fazer na rede; 
         dest = 0;
         strcpy(node_token.token, token);
+
+        vidas = malloc(sizeof(uint8_t)*NUM_NODES);
+        memset(vidas, 3, NUM_NODES);
+
+        apostas = malloc(sizeof(uint8_t)*NUM_NODES);
+        memset(apostas, 0, NUM_NODES);
+
+
         baralho = malloc(sizeof(unsigned int)*TAM_BARALHO);
         memset(baralho, 0, TAM_BARALHO*sizeof(unsigned int));
     }
@@ -273,7 +297,7 @@ int main(int argc, char *argv[]){
                                 aposta = apostar(round);
                                 printf("Apostado ");
                                 memset(data_buffer, 0, MAX_DATA_LENGHT+1);
-                                snprintf(data_buffer, 5 ,"%c:%c|",converte_int_char(index), converte_int_char(aposta));
+                                snprintf(data_buffer, 3 ,"%c|", converte_int_char(aposta));
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, 1);
                             }
                             break; 
@@ -302,11 +326,11 @@ int main(int argc, char *argv[]){
                         
                         case BET_FLAG:
                             {
-                                char bet[5];
+                                char bet[3];
                                 aposta = apostar(round);
                                 printf("Apostado\n");
                                 memcpy(data_buffer, message.data, MAX_DATA_LENGHT+1);
-                                snprintf(bet, 5 ,"%c:%c|",converte_int_char(index), converte_int_char(aposta));
+                                snprintf(bet, 3 ,"%c|", converte_int_char(aposta));
                                 strcat(data_buffer, bet);
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, next_node_index);
                             }
@@ -390,6 +414,11 @@ int main(int argc, char *argv[]){
                         printf("Apostas da partida: %s\n", message.data);
                         
                         if(message.dest == 0){
+                            converte_apostas(message.data, message.size, apostas, 4);
+
+                            for(int i=0; i < 4; ++i)
+                                printf("a[%d] = %d\n", i, apostas[i]);
+
                             MASTER_FLAG = MATCH_FLAG;
                         }
                     }
