@@ -14,7 +14,7 @@
 
 #define TOKEN_RING_SIZE 66
 #define TOKEN_SIZE 64
-#define FRAME_SIZE 2057
+#define FRAME_SIZE 2058
 
 
 #define START 0x7e
@@ -29,6 +29,7 @@
 struct message_frame{
     uint8_t start;                        //Bits de inicio transmissão
     unsigned int size;                    //Define o tamanho do campo *data
+    uint8_t dest;                         //Define o índice de destino
     uint8_t flag;                         //Flags que definem o "momento do jogo" (embaralhamento, aposta, partida, resultados)
     uint8_t round;                        //Determina em qual rodada está o jogo 
     uint8_t num_cards;                    //Informa quantas cartas estão presentes na rodada
@@ -39,6 +40,7 @@ struct token_ring{
     uint8_t start;                        //Bits de inicio transmissão
     char token[TOKEN_SIZE+1];
 };
+    struct sockaddr_in to_addr; //Estrutura para endereçamento do destino
 
 int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
     memset(addr, 0, sizeof(*addr));
@@ -62,15 +64,17 @@ void setar_nodo(struct sockaddr_in *node, unsigned int index){
 void inicializa_frame(struct message_frame *frame){
     frame->start = START;
     frame->size  = MAX_DATA_LENGHT+1;
+    frame->dest  = 0;
     frame->flag  = SHUFFLE_FLAG;
     frame->round = 0;
     frame->num_cards = 0;
     memset(frame->data, 0, MAX_DATA_LENGHT+1);
 }
 
-void preparar_mensagem(struct message_frame *frame, char *data, unsigned int size, int flag, int round, int num_cards){
+void preparar_mensagem(struct message_frame *frame, char *data, unsigned int size, int flag, int round, int num_cards, uint8_t dest){
     frame->start = START;
     frame->size  = size;
+    frame->dest = dest;
     frame->flag  = flag;
     frame->round = round;
     frame->num_cards = num_cards;
@@ -105,11 +109,8 @@ struct token_ring incializa_token(){
     return t;
 }
 
-int enviar_cartas(unsigned int *baralho, int dest_index, int sock, int n){
-    struct sockaddr_in to_addr; //Estrutura para endereçamento do destino
+struct message_frame seta_mensagem_shuffle(unsigned int *baralho, int dest_index, uint8_t round, int n){
     struct message_frame cards; //Frame com as cartas a serem enviades
-
-    setar_nodo(&to_addr, dest_index); //Seta o nodo de destino com o parâmetro dest_index
 
     struct carta_t *deck; //Vetor que representará a 'mão' de cartas 
 
@@ -119,7 +120,8 @@ int enviar_cartas(unsigned int *baralho, int dest_index, int sock, int n){
     /* Inicializa o frame com os dados necessários */
     cards.start = START;
     cards.flag  = SHUFFLE_FLAG;
-    cards.round = 0;
+    cards.dest  = dest_index;
+    cards.round = round;
     memset(cards.data, 0, MAX_DATA_LENGHT+1);
 
     /* Converte o vetor deck para uma string formatada em cards.data. Recebe o ponteo de cards.size para salvar o tamanho*/
@@ -130,10 +132,7 @@ int enviar_cartas(unsigned int *baralho, int dest_index, int sock, int n){
     /*Libera o vetor do deck q nn será mais útil*/
     free(deck);
 
-    if( sendto(sock, (char*)&cards, FRAME_SIZE, 0, (struct sockaddr*)&to_addr, sizeof(to_addr)) < 0) 
-        perror("Falha ao fazer sendto()\n");
-
-    return 1;
+    return cards;
 }
 
 struct carta_t *vetor_cartas(char *data, unsigned int n, uint8_t num_cards){
@@ -187,7 +186,7 @@ void receber_token(int sock, struct token_ring *node_token ,struct sockaddr_in f
 int main(int argc, char *argv[]){
     int sock, index; 
     struct sockaddr_in my_addr, next_node_addr, from_addr;   
-    uint8_t MASTER_FLAG;
+    uint8_t MASTER_FLAG, dest;
     struct message_frame message; 
     char data_buffer[MAX_DATA_LENGHT+1];
     char frame_buffer[FRAME_SIZE];
@@ -221,7 +220,7 @@ int main(int argc, char *argv[]){
 
     int opt; 
 
-    printf("Iniciar:\n[1] - Sim\n[2]-Sair");
+    printf("Iniciar:\n[1] - Sim\n[2]-Sair\n");
     scanf("%d", &opt);
     if(opt == 2){
         close(sock);
@@ -231,12 +230,14 @@ int main(int argc, char *argv[]){
 
     if(index == 0){
         MASTER_FLAG = SHUFFLE_FLAG;    //Flag que só o indice 0 (o mestre do jogo) possui indicando o que ele deve fazer na rede; 
+        dest = 0;
         strcpy(node_token.token, token);
         baralho = malloc(sizeof(unsigned int)*TAM_BARALHO);
         memset(baralho, 0, TAM_BARALHO*sizeof(unsigned int));
     }
 
     int aposta, round = 1; 
+    dest = 0;
     while(1){
 
         /* Sequência de operações para quando se tem o token*/
@@ -253,25 +254,28 @@ int main(int argc, char *argv[]){
 
                         case SHUFFLE_FLAG:
                             {
-                                deck = malloc(9*sizeof(struct carta_t));
-                                gera_cartas_aleatorias(deck, baralho, 9);
-                                for(int i=1; i < NUM_NODES; ++i)
-                                    enviar_cartas(baralho, i, sock, 1);  
-
-                                aposta = apostar(round);
-                                printf("Apostado ");
-                                memset(data_buffer, 0, MAX_DATA_LENGHT+1);
-                                printf("Zerado ");
-                                snprintf(data_buffer, 5 ,"%c:%c|",converte_int_char(index), converte_int_char(aposta));
-                                printf("Setado ");
-                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0);
+                                if(dest == 0){
+                                    deck = malloc(9*sizeof(struct carta_t));
+                                    gera_cartas_aleatorias(deck, baralho, 9);
+                                }
+                                dest++;
+                                
+                                if(dest < NUM_NODES)
+                                    message = seta_mensagem_shuffle(baralho, dest, round, 9);
+                                
                                 printf("Preparado \n");
 
-                                MASTER_FLAG = BET_FLAG;
                             }
                             break;
                         
                         case BET_FLAG:
+                            {
+                                aposta = apostar(round);
+                                printf("Apostado ");
+                                memset(data_buffer, 0, MAX_DATA_LENGHT+1);
+                                snprintf(data_buffer, 5 ,"%c:%c|",converte_int_char(index), converte_int_char(aposta));
+                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, 1);
+                            }
                             break; 
                 
                         case MATCH_FLAG:
@@ -281,6 +285,44 @@ int main(int argc, char *argv[]){
                             break;
 
                     }                
+                }
+                else{
+                    switch(message.flag){
+
+                           case SHUFFLE_FLAG:
+                            {
+                                if(message.dest == index){
+                                    memset(data_buffer, 0, MAX_DATA_LENGHT+1);
+                                    snprintf(data_buffer, 12 ,"RECEBIDO:%c\n", converte_int_char(index));
+                                    preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, SHUFFLE_FLAG, round, 9, 0);
+                                }
+                                printf("Preparado \n");
+                            }
+                            break;
+                        
+                        case BET_FLAG:
+                            {
+                                char bet[5];
+                                aposta = apostar(round);
+                                printf("Apostado\n");
+                                memcpy(data_buffer, message.data, MAX_DATA_LENGHT+1);
+                                snprintf(bet, 5 ,"%c:%c|",converte_int_char(index), converte_int_char(aposta));
+                                strcat(data_buffer, bet);
+                                preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, 0, next_node_index);
+                            }
+                            break; 
+                
+                        case MATCH_FLAG:
+                            break; 
+
+                        case RESULTS_FLAG:
+                            break;
+
+                    }
+
+
+
+
                 }
 
                 /* Adicionar casos especiais de envio*/
@@ -326,13 +368,31 @@ int main(int argc, char *argv[]){
             switch(message.flag){
 
                 case SHUFFLE_FLAG: 
-                    deck = vetor_cartas(message.data, message.size, message.num_cards);
-                    print_deck(deck, message.num_cards);
+                    {                
+                        if(message.dest == 0){
+                            printf("%s\n", message.data);
+
+                            if(dest == 3){
+                                MASTER_FLAG = BET_FLAG; 
+                                dest = 0;   
+                            }
+                        }
+                        else if (message.dest == index){
+                            deck = vetor_cartas(message.data, message.size, message.num_cards);
+                            print_deck(deck, message.num_cards);
+                        } 
+                    }
+                    
                     break; 
 
                 case BET_FLAG:
-                    printf("Bet received %s\n", message.data);
-                    receber_token(sock, &node_token , from_addr, addr_size);
+                    {
+                        printf("Apostas da partida: %s\n", message.data);
+                        
+                        if(message.dest == 0){
+                            MASTER_FLAG = MATCH_FLAG;
+                        }
+                    }
                     break; 
                 
                 case MATCH_FLAG:
@@ -346,6 +406,8 @@ int main(int argc, char *argv[]){
             }
 
         }        
+
+        receber_token(sock, &node_token , from_addr, addr_size);
 
     }
        
