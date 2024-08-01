@@ -6,7 +6,6 @@ struct carta_t carta_aleatoria(unsigned int *baralho){
     int r;
 
     r = rand()%40;
-    printf("R:%d\n", r);
     while(baralho[r]){
         r = rand()%40;
     }
@@ -22,6 +21,13 @@ void gera_cartas_aleatorias(struct carta_t *v, unsigned int *baralho, unsigned i
 
     for(int i=0; i < n; ++i){
         v[i] = carta_aleatoria(baralho);
+    }
+}
+
+void print_deck(struct carta_t *v, unsigned int n){
+
+    for(int i=0; i < n; ++i){
+        printf("%c de %c\n", converte_numero_baralho(v[i].num), converte_numero_naipe(v[i].naipe));
     }
 }
 
@@ -128,13 +134,89 @@ int converte_char_naipe(char i){
             return 0;
             break; 
         case 'E':
-            return 2;
+            return 1;
             break; 
         case 'C':
-            return 3;
+            return 2;
             break; 
         case 'P':
+            return 3;
+            break;
+    }
+
+    return -1;
+}
+
+int converte_char_int(char i){
+    
+    switch(i){
+        case '0':
+            return 0;
+            break;
+        case '1':
+            return 1;
+            break; 
+        case '2':
+            return 2;
+            break; 
+        case '3':
+            return 3;
+            break; 
+        case '4':
             return 4;
+            break;
+        case '5':
+            return 5;
+            break;
+        case '6':   
+            return 6;
+            break;
+        case '7':
+            return 7; 
+            break;
+        case '8':
+            return 8; 
+            break;
+        case '9':
+            return 9;
+            break;
+    }
+
+    return -1;
+}
+
+char converte_int_char(int i){
+    
+    switch(i){
+        case 0:
+            return '0';
+            break;
+        case 1:
+            return '1';
+            break; 
+        case 2:
+            return '2';
+            break; 
+        case 3:
+            return '3';
+            break; 
+        case 4:
+            return '4';
+            break;
+        case 5:
+            return '5';
+            break;
+        case 6:   
+            return '6';
+            break;
+        case 7:
+            return '7'; 
+            break;
+        case 8:
+            return '8'; 
+            break;
+        case 9:
+            return '9';
             break;
     }
 
