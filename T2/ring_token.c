@@ -24,6 +24,10 @@
 #define RESULTS_FLAG 3
 #define ALL_BETS 4
 
+
+#define LOCAL_PORT 12346       // Porta local de recepção
+#define NEXT_NODE_PORT 12345   // Porta do próximo nó no anel
+
 #define MAX_ROUNDS 9
 #define TAM_BARALHO 40
 
@@ -42,11 +46,11 @@ struct token_ring{
     char token[TOKEN_SIZE+1];
 };
 
-int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
+int bind_socket(int sock, struct sockaddr_in *addr, unsigned int port){
     memset(addr, 0, sizeof(*addr));
     addr->sin_family = AF_INET;
     addr->sin_addr.s_addr = htonl(INADDR_ANY);
-    addr->sin_port = htons(PORT_BASE + index);
+    addr->sin_port = htons(port);
 
     if(bind(sock, (struct sockaddr*)addr, sizeof(*addr)) == -1)
         return 0; 
@@ -325,7 +329,7 @@ int main(int argc, char *argv[]){
     if(sock == -1)
         perror("Falha ao criar socket\n");
 
-    if(!bind_socket(sock, &my_addr, index))
+    if(!bind_socket(sock, &my_addr, port))
         perror("Falha no bind do socket\n");
     
     printf("Socket para %d: %d\n", index, sock);
