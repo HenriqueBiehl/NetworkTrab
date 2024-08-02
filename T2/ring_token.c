@@ -54,11 +54,11 @@ int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
     return 1;
 }
 
-void setar_nodo(struct sockaddr_in *node, unsigned int index){
+void setar_nodo(struct sockaddr_in *node, unsigned int index, unsigned short port){
     memset(node, 0, sizeof(*node));
     node->sin_family = AF_INET;
     node->sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // Para simplicidade, usando loopback
-    node->sin_port = htons(PORT_BASE + index);
+    node->sin_port = htons(port);
 }
 
 void inicializa_frame(struct message_frame *frame){
@@ -286,7 +286,7 @@ int main(int argc, char *argv[]){
     uint8_t *apostas;
     uint8_t *vitorias;
     uint8_t *rodada;
-
+    unsigned short port = PORT_BASE; 
 
     struct message_frame message; 
     char data_buffer[MAX_DATA_LENGHT+1];
@@ -307,6 +307,20 @@ int main(int argc, char *argv[]){
     int next_node_index = (index + 1) % NUM_NODES;
     printf("Index: %d\n", index);
 
+    if(argc == 4){
+        port = atoi(argv[3]);
+        // Converter IP de string para endereço binário
+        setar_nodo(&next_node_addr, next_node_index, port);
+        if (inet_pton(AF_INET, argv[2], &next_node_addr.sin_addr) <= 0) {
+            perror("inet_pton");
+            exit(1);
+        }
+    }
+    else {
+        port += next_node_index;
+        setar_nodo(&next_node_addr, next_node_index, port);
+    }
+
     sock = socket(PF_INET, SOCK_DGRAM,0 );
     if(sock == -1)
         perror("Falha ao criar socket\n");
@@ -315,7 +329,6 @@ int main(int argc, char *argv[]){
         perror("Falha no bind do socket\n");
     
     printf("Socket para %d: %d\n", index, sock);
-    setar_nodo(&next_node_addr, next_node_index);
 
     socklen_t addr_size;
 
