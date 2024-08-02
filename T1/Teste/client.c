@@ -74,7 +74,7 @@ void copiar_frame_buffer(char *buffer, struct networkFrame frame){
 }
 
 // recebe um do tipo lista e imprime na tela o nome do arquivo recebido
-void receber_mensagem_lista(struct networkFrame frame) {
+void receber_mensagem_mostrar_tela(struct networkFrame frame) {
         printf("%s", frame.data);
 }
 
@@ -199,30 +199,37 @@ int main(){
                         exit(0);
                 }
 
-                char pack[FRAME_SIZE];
-                socklen_t add_len = sizeof(struct sockaddr_in);
-
-                int rec = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                if (rec < 0) {
-                        perror("Erro ao receber mensagem");
-                        close(sckt);
-                        return -1;
-                }
-
                 struct networkFrame recieved;
-                memcpy(&recieved, pack, FRAME_SIZE);
-
-                switch (recieved.type) {
-                        case (LISTA):
+                socklen_t add_len = sizeof(struct sockaddr_in);
+                memset(&recieved, 0, FRAME_SIZE);
+                memset(&message, 0, FRAME_SIZE);
+                
+                int rec;
+                //while(1){
+                        rec = recvfrom(sckt, (char *)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                        if (rec < 0) {
+                                perror("Erro ao receber mensagem");
+                                close(sckt);
+                                return -1;
+                        }
+                        else    
+                                printFrame(recieved);
+                //}
+                
+                if(recieved.start == START){
+                   switch (recieved.type) {
+                        case (MOSTRA_NA_TELA):
+                                printf("Recebi mostra na tela\n");
                                 while (recieved.type != FIM_TX) {
-                                        receber_mensagem_lista(recieved);
-                                        rec = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                                        printf("No while\n");
+                                        receber_mensagem_mostrar_tela(recieved);
+                                        rec = recvfrom(sckt, (char*)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
                                         if (rec < 0) {
                                                 perror("Erro ao receber mensagem");
                                                 close(sckt);
+                                                /* Caso de NACK*/
                                                 return -1;
                                         }
-                                        memcpy(&recieved, pack, FRAME_SIZE);
                                 }
 
                                 printf("Fim da transmissao, listado o diretorio\n");
@@ -240,6 +247,7 @@ int main(){
                                 }
 
                                 break;
+                        }
                 }
         }
         close(sckt);

@@ -77,13 +77,13 @@ FILE *listar_no_buffer() {
         return fp;
 }
 
-struct networkFrame gerar_mensagem_enviar_nome(char *nome, uint8_t seq) {
+struct networkFrame gerar_mensagem_enviar_mostra_tela(char *nome, uint8_t seq) {
 
         struct networkFrame message;
         message.start = START;
         message.size = strlen(nome);
         message.seq = seq;
-        message.type = LISTA;
+        message.type = MOSTRA_NA_TELA;
         memset(message.data, 0, MAX_DATA_LENGHT);
         memcpy(&message.data, nome, message.size);
         message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
@@ -149,8 +149,6 @@ int main(){
 
         int sckt = cria_raw_socket();
         struct networkFrame message;
-        //char msg[MAX_DATA_LENGHT];
-        char pack[FRAME_SIZE];
 
         bind_raw_socket(sckt, "lo");
         setar_modo_promiscuo(sckt, "lo");
@@ -164,7 +162,7 @@ int main(){
         int ret;
         int i;
         while(1) {
-                ret = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+                ret = recvfrom(sckt, (char *)&message, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
                 if (ret < 0) {
                         perror("Erro ao receber mensagem");
                         close(sckt);
@@ -173,88 +171,78 @@ int main(){
                         printf("Received packet from %s:\n", client_addr.sll_addr);
                         //exit(1);
                 }
-                //printf("got it pal\n");
-                //printf("%d bytes read. I shouldve got %d\n", ret, FRAME_SIZE);
-                memcpy(&message, pack, FRAME_SIZE);
-                //printf("Type = %u\n", message.type);
-                //printFrame(message);
-                switch(message.type) {
-                        case(ACK):
-                                printf("ACK, esperando proxima mensagem\n");
-                                break;
-                        case(MOSTRA_NA_TELA):
-                                printf("Mostrar na tela\n");
-                                break;
-                        case(LISTA):
-                                printf("LISTA\n");
-                                char msg[FRAME_SIZE];
-                                //int ifindex = if_nametoindex("lo");
-                                FILE *buffer_lista = listar_no_buffer();
 
-                                char line[256];
-                                i = 0;
-                                while (fgets(line, sizeof(line), buffer_lista)) {
-                                        struct networkFrame mensagem_atual = gerar_mensagem_enviar_nome(line, i++);
-                                        memcpy(msg, &mensagem_atual, FRAME_SIZE);
+                if(message.start == START){
+                        //printf("got it pal\n");
+                        //printf("%d bytes read. I shouldve got %d\n", ret, FRAME_SIZE);
+                        //printf("Type = %u\n", message.type);
+                        //printFrame(message);
+                        switch(message.type) {
+                                case(ACK):
+                                        printf("ACK, esperando proxima mensagem\n");
+                                        break;
+                                case(MOSTRA_NA_TELA):
+                                        printf("Mostrar na tela\n");
+                                        break;
+                                case(LISTA):
+                                        printf("LISTA\n");
+                                        char msg[FRAME_SIZE];
+                                        //int ifindex = if_nametoindex("lo");
+                                        FILE *buffer_lista = listar_no_buffer();
+
+                                        char line[256];
+                                        i = 0;
+                                        while (fgets(line, sizeof(line), buffer_lista)) {
+                                                printf("&& %s\n", line);
+                                                struct networkFrame mensagem_atual = gerar_mensagem_enviar_mostra_tela(line, i++);
+                                                printFrame(mensagem_atual);
+                                                memcpy(msg, &mensagem_atual, FRAME_SIZE);
+                                                ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                                if(ret < 0){
+                                                        fprintf(stderr, "Falha ao fazer sendto()");
+                                                        return -1;
+                                                }
+                                                //printf("%s", line);
+                                        } 
+                                        struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
+                                        printf("enviando fim da tx\n");
+                                        memcpy(msg, &mensagem_fim_tx, FRAME_SIZE);
                                         ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
                                         if(ret < 0){
                                                 fprintf(stderr, "Falha ao fazer sendto()");
                                                 return -1;
                                         }
-                                        //printf("%s", line);
-                                } 
-                                struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
-                                printf("enviando fim da tx\n");
-                                memcpy(msg, &mensagem_fim_tx, FRAME_SIZE);
-                                ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
-                                if(ret < 0){
-                                        fprintf(stderr, "Falha ao fazer sendto()");
-                                        return -1;
-                                }
 
-                                fclose(buffer_lista);
-                                //exit (0); // Exit se nao buga e crasha...
-                                //printFrame(mensagem);
-                                break;
-                        case(BAIXAR):
-                                printf("BAIXAR: %s\n", message.data);
-                                char arqNome[64];
-                                char buffer[63];
-                                FILE *arq;                        
+                                        fclose(buffer_lista);
+                                        //exit (0); // Exit se nao buga e crasha...
+                                        //printFrame(mensagem);
+                                        break;
+                                case(BAIXAR):
+                                        printf("BAIXAR: %s\n", message.data);
+                                        char arqNome[64];
+                                        char buffer[63];
+                                        FILE *arq;                        
 
 
-                                memset(arqNome,0,64);
-                                memset(buffer,0,63);
-                                memcpy(arqNome, message.data, message.size);
-                                arq = abrir_arquivo(arqNome, "r");
-                                i = 0;
-                                if(!arq){
-                                        printf("Erro: nao encontrado\n");
-                                        snprintf(buffer,15,"Nao econtrado\n");
-                                        struct networkFrame mensagem_erro = gerar_mensagem_erro(i, buffer);
-                                        printf("enviando mensagem_erro\n");
-                                        memcpy(msg, &mensagem_erro, FRAME_SIZE);
-                                        ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
-                                        if(ret < 0){
-                                                fprintf(stderr, "Falha ao fazer sendto()");
-                                                return -1;
+                                        memset(arqNome,0,64);
+                                        memset(buffer,0,63);
+                                        memcpy(arqNome, message.data, message.size);
+                                        arq = abrir_arquivo(arqNome, "r");
+                                        i = 0;
+                                        if(!arq){
+                                                printf("Erro: nao encontrado\n");
+                                                snprintf(buffer,15,"Nao econtrado\n");
+                                                struct networkFrame mensagem_erro = gerar_mensagem_erro(i, buffer);
+                                                printf("enviando mensagem_erro\n");
+                                                memcpy(msg, &mensagem_erro, FRAME_SIZE);
+                                                ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                                if(ret < 0){
+                                                        fprintf(stderr, "Falha ao fazer sendto()");
+                                                        return -1;
+                                                }
                                         }
-                                }
-                                else{                                        
-                                        fread(buffer, 63, MAX_DATA_LENGHT , arq);
-                                        struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, ret);
-                                        printf("enviando mensagem_dados %d\n", i);
-                                        memcpy(msg, &mensagem_dados, FRAME_SIZE);
-                                        ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
-                                        if(ret < 0){
-                                                fprintf(stderr, "Falha ao fazer sendto()");
-                                                return -1;
-                                        }
-                                        else 
-                                                ++i;
-
-                                        while (!feof(arq)) {
-                                                ret = fread(buffer, 63, MAX_DATA_LENGHT, arq);
+                                        else{                                        
+                                                fread(buffer, 63, MAX_DATA_LENGHT , arq);
                                                 struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, ret);
                                                 printf("enviando mensagem_dados %d\n", i);
                                                 memcpy(msg, &mensagem_dados, FRAME_SIZE);
@@ -265,29 +253,44 @@ int main(){
                                                 }
                                                 else 
                                                         ++i;
+
+                                                while (!feof(arq)) {
+                                                        ret = fread(buffer, 63, MAX_DATA_LENGHT, arq);
+                                                        struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, ret);
+                                                        printf("enviando mensagem_dados %d\n", i);
+                                                        memcpy(msg, &mensagem_dados, FRAME_SIZE);
+                                                        ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                                        if(ret < 0){
+                                                                fprintf(stderr, "Falha ao fazer sendto()");
+                                                                return -1;
+                                                        }
+                                                        else 
+                                                                ++i;
+                                                }
+
+                                                struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
+                                                printf("enviando fim da tx\n");
+                                                memcpy(msg, &mensagem_fim_tx, FRAME_SIZE);
+                                                ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                                if(ret < 0){
+                                                        fprintf(stderr, "Falha ao fazer sendto()");
+                                                        return -1;
+                                                }
+
+                                                fclose(arq);
                                         }
+                                        break;
+                        }
 
-                                        struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
-                                        printf("enviando fim da tx\n");
-                                        memcpy(msg, &mensagem_fim_tx, FRAME_SIZE);
-                                        ret = sendto(sckt, msg, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
-                                        if(ret < 0){
-                                                fprintf(stderr, "Falha ao fazer sendto()");
-                                                return -1;
-                                        }
+                        /* CRC8 esta dando problema */
+                        /*if (verifica_crc8((uint8_t*)&message, sizeof(message) - 1, message.crc8)) {
+                                printf("crc deu boinas\n");
+                        }
+                        else {
+                                printf("num deu o crc\n");
+                        }*/
 
-                                        fclose(arq);
-                                }
-                                break;
                 }
-
-                /* CRC8 esta dando problema */
-                /*if (verifica_crc8((uint8_t*)&message, sizeof(message) - 1, message.crc8)) {
-                        printf("crc deu boinas\n");
-                }
-                else {
-                        printf("num deu o crc\n");
-                }*/
         }
 
         close(sckt);
