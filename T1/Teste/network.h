@@ -42,6 +42,8 @@ uint8_t calcula_crc8(uint8_t *data, size_t len);
 
 int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido);
 
+FILE *abrir_arquivo(char *nome, char *tipo);
+
 /*
         Lista os conteúdos de um diretório e envia para um arquivo temporário "lista"         
 */

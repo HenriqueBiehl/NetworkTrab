@@ -92,6 +92,21 @@ struct networkFrame gerar_mensagem_lista(uint8_t seq) {
         return message;
 }
 
+struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = tam;
+        message.seq    = seq; 
+        message.type   = BAIXAR; //Só pra testar
+        memset(message.data, 0, MAX_DATA_LENGHT);
+        memcpy(&message.data, arqNome, tam);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+
+}
+
 struct networkFrame gerar_mensagem_ack(uint8_t seq) {
 
         struct networkFrame message; 
@@ -147,8 +162,36 @@ int main(){
                         }
                         // Enviar a mensagem para listar
                 } else if (strncmp(input, "baixar", 6) == 0) {
+                        char nomeArquivo[64]; 
+                        printf("Digite o nome do arquivo:\n");
+                        getchar();
+                        fgets(nomeArquivo, MAX_DATA_LENGHT, stdin);
+                        printf("%s", nomeArquivo);
+                        for(int i=0; i < strlen(nomeArquivo); ++i){
+                                printf("%d = %c\n", i, nomeArquivo[i]);
+                        }
+                        if(nomeArquivo[strlen(nomeArquivo)-1] == '\n'){
+                                nomeArquivo[strlen(nomeArquivo)-1] = '\0';
+                        }
+                        
+                        for(int i=0; i < strlen(nomeArquivo); ++i){
+                                printf("%d = %c\n", i, nomeArquivo[i]);
+                        }
+
+                        printf("%s", nomeArquivo);
+                        message = gerar_mensagem_baixar(seq, nomeArquivo, strlen(nomeArquivo));
+
+ 
+
+                        int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                        if (ret < 0) {
+                                fprintf(stderr, "Falha ao fazer sendto()");
+                                return -1;
+                        } else {
+                                printf("Mensagem enviada, aguardando servidor\n");
+                        }
+
                         // Enviar a mensagem para baixar
-                        exit(0);
                 } else if (strcmp(input, "exit") == 0) {
                         exit(0);
                 } else {
