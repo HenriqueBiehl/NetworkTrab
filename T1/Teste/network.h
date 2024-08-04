@@ -23,7 +23,7 @@
 #define FIM_TX 30
 #define ERRO 31
 
-#define DIR_CONTEUDOS "conteudos"
+#define DIR_CONTEUDOS "conteudos/"
 
 struct __attribute__((packed)) networkFrame {
         uint8_t start; 

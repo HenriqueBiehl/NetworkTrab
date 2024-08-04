@@ -173,15 +173,13 @@ int main(){
                         if(nomeArquivo[strlen(nomeArquivo)-1] == '\n'){
                                 nomeArquivo[strlen(nomeArquivo)-1] = '\0';
                         }
-                        
+
                         for(int i=0; i < strlen(nomeArquivo); ++i){
                                 printf("%d = %c\n", i, nomeArquivo[i]);
                         }
 
                         printf("%s", nomeArquivo);
                         message = gerar_mensagem_baixar(seq, nomeArquivo, strlen(nomeArquivo));
-
- 
 
                         int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
                         if (ret < 0) {
@@ -203,50 +201,90 @@ int main(){
                 socklen_t add_len = sizeof(struct sockaddr_in);
                 memset(&recieved, 0, FRAME_SIZE);
                 memset(&message, 0, FRAME_SIZE);
-                
+
                 int rec;
                 //while(1){
-                        rec = recvfrom(sckt, (char *)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                        if (rec < 0) {
-                                perror("Erro ao receber mensagem");
-                                close(sckt);
-                                return -1;
-                        }
-                        else    
-                                printFrame(recieved);
+                rec = recvfrom(sckt, (char *)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                if (rec < 0) {
+                        perror("Erro ao receber mensagem");
+                        close(sckt);
+                        return -1;
+                } else {
+                        printFrame(recieved);
+                }
                 //}
-                
+
                 if(recieved.start == START){
-                   switch (recieved.type) {
-                        case (MOSTRA_NA_TELA):
-                                printf("Recebi mostra na tela\n");
-                                while (recieved.type != FIM_TX) {
-                                        printf("No while\n");
-                                        receber_mensagem_mostrar_tela(recieved);
-                                        rec = recvfrom(sckt, (char*)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                                        if (rec < 0) {
-                                                perror("Erro ao receber mensagem");
-                                                close(sckt);
-                                                /* Caso de NACK*/
-                                                return -1;
+                        printFrame(recieved);
+                        switch (recieved.type) {
+                                case (MOSTRA_NA_TELA):
+                                        printf("Recebi MOSTRA_NA_TELA\n");
+                                        while (recieved.type != FIM_TX) {
+                                                printf("Mostrando...\n");
+                                                receber_mensagem_mostrar_tela(recieved);
+                                                rec = recvfrom(sckt, (char*)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                                                if (rec < 0) {
+                                                        perror("Erro ao receber mensagem");
+                                                        close(sckt);
+                                                        /* Caso de NACK*/
+                                                        return -1;
+                                                }
                                         }
-                                }
 
-                                printf("Fim da transmissao, listado o diretorio\n");
-                                printf("enviando ACK\n");
+                                        printf("Fim da transmissao, listado o diretorio\n");
+                                        printf("enviando ACK\n");
 
-                                //printFrame(recieved);
-                                message = gerar_mensagem_ack(seq++);
-                                int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                                if (ret < 0) {
-                                        fprintf(stderr, "Falha ao fazer sendto()");
-                                        return -1;
-                                } else {
-                                        printFrame(message);
-                                        printf("Ack enviado");
-                                }
+                                        //printFrame(recieved);
+                                        message = gerar_mensagem_ack(seq++);
+                                        int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                                        if (ret < 0) {
+                                                fprintf(stderr, "Falha ao fazer sendto()");
+                                                return -1;
+                                        } else {
+                                                printFrame(message);
+                                                printf("Ack enviado");
+                                        }
 
-                                break;
+                                        break;
+                                case (DADOS):
+                                        printf("Recebi DADOS\n");
+                                        FILE *baixado = fopen("baixado.mp4", "wb+");
+                                        int count = 1;
+                                        while (recieved.type != FIM_TX) {
+                                                if (recieved.start != START) {
+                                                        printf("mensagem invalida............\n");
+                                                        continue;
+                                                }
+                                                printf("Baixando(%d)...\n", count++);
+                                                //printFrame(recieved);
+                                                fwrite(recieved.data, sizeof(char), recieved.size, baixado);
+                                                rec = recvfrom(sckt, (char*)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+                                                if (rec < 0) {
+                                                        perror("Erro ao receber mensagem");
+                                                        close(sckt);
+                                                        /* Caso de NACK*/
+                                                        return -1;
+                                                }
+                                        }
+                                        if (verifica_crc8((uint8_t*)&recieved, sizeof(recieved) - 1, recieved.crc8)) {
+                                                printf("CRC deu certo\n");
+                                        } else {
+                                                printf("CRC deu errado\n");
+                                        }
+                                        printf("Recebeu o FIM_TX, fechando o arquivo ....n");
+                                        fclose(baixado);
+
+                                        //Enviando ack
+                                        message = gerar_mensagem_ack(seq++);
+                                        ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+                                        if (ret < 0) {
+                                                fprintf(stderr, "Falha ao fazer sendto()");
+                                                return -1;
+                                        } else {
+                                                printFrame(message);
+                                                printf("Ack enviado");
+                                        }
+                                        printFrame(recieved);
                         }
                 }
         }

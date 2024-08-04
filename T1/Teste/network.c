@@ -55,6 +55,7 @@ FILE *abrir_arquivo(char *nome, char *tipo)
 {
 	FILE *arq; 
 	
+        printf("tentando abrir %s\n", nome);
 	arq = fopen(nome, tipo); 
 
 	if(!arq) {
