@@ -43,7 +43,7 @@ void descontar_vidas_perdidas(uint8_t *vidas, uint8_t *apostas, uint8_t *vitoria
 
 int vida_final_partida(char *data, unsigned int n, int checkpointVidas, unsigned int index, unsigned int maxHand);
 
-void print_apostas(char *apostas, unsigned int n , unsigned maxHand);
+void print_apostas(char *apostas, unsigned int n , int maxHand);
 
 void print_mao(struct carta_t *mao, unsigned int n, unsigned int round);
 
@@ -53,6 +53,8 @@ void print_resultado_rodada(char *data, unsigned int n, int round);
 
 void print_resultado_partida(char *data, unsigned int n, int maxHand);
 
+void print_fim_jogo(char *data, unsigned int n, int maxHand);
+
 char converte_numero_naipe(unsigned int i);
 
 int converte_char_baralho(char i);
@@ -61,5 +63,11 @@ int converte_char_naipe(char i);
 
 int converte_char_int(char i);
 
+char *converte_char_naipe_string(char i);
+
+char *converte_int_naipe_string(int i);
+
 char converte_int_char(int i);
+
+void header_jogo_dane_se();
 

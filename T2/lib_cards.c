@@ -32,7 +32,7 @@ void print_deck(struct carta_t *v, unsigned int n){
 
     for(int i=0; i < n; ++i){
         if(v[i].num != USADA)
-            printf("[%d] - %c de %c| ", i+1, converte_numero_baralho(v[i].num), converte_numero_naipe(v[i].naipe));
+            printf("[%d] - %c de %s\n", i+1, converte_numero_baralho(v[i].num), converte_int_naipe_string(v[i].naipe));
     }
     printf("\n");
 }
@@ -139,26 +139,27 @@ void descontar_vidas_perdidas(uint8_t *vidas, uint8_t *apostas, uint8_t *vitoria
     uint8_t desconto; 
 
     for(int i = 0; i < n; ++i){
-        
-        //Para evitar dar numero negativo
-        if(vitorias[i] > apostas[i])
-            desconto = vitorias[i] - apostas[i];
-        else 
-            desconto = apostas[i] - vitorias[i];
+        if(vidas[i] != 0){
+                    //Para evitar dar numero negativo
+            if(vitorias[i] > apostas[i])
+                desconto = vitorias[i] - apostas[i];
+            else 
+                desconto = apostas[i] - vitorias[i];
 
 
-        if(desconto > vidas[i])
-            vidas[i] = 0;
-        else 
-            vidas[i] -= desconto;
+            if(desconto > vidas[i])
+                vidas[i] = 0;
+            else 
+                vidas[i] -= desconto;
+        }
     }
 }
 
 int vida_final_partida(char *data, unsigned int n, int checkpointVidas, unsigned int index, unsigned int maxHand){
     int vidaFinalPartida;
     int indexData;
-
-     for(int i = 0; i < n-1; i+=5){
+    
+    for(int i = 0; i < n-1; i+=5){
        indexData = converte_char_int(data[i]);
 
        if(indexData == index){
@@ -187,12 +188,16 @@ void print_mao(struct carta_t *mao, unsigned int n, unsigned int round){
 
 }
 
-void print_apostas(char *apostas, unsigned int n , unsigned maxHand){
+void print_apostas(char *apostas, unsigned int n , int maxHand){
     
     printf("\n--------- APOSTAS COM MAO %d --------\n", maxHand);  
     printf("\n");    
     for(int i = 0; i < n; i+=2){
-        printf("JOGADOR %d diz que faz %d\n", i/2, converte_char_int(apostas[i]));
+
+        if(converte_char_int(apostas[i]) != MORTO)
+            printf("JOGADOR %d diz que faz %d\n", i/2, converte_char_int(apostas[i]));
+        else 
+            printf("JOGADOR %d está MORTO\n", i/2);
     }
     printf("\n");
     printf("-------------------------------------\n");
@@ -206,7 +211,11 @@ void print_mesa(char *data, unsigned int n){
     printf("GATO: %c de %c\n", data[0], data[1]);
 
     for(int i = 3; i < n-1; i+=3){
-        printf("JOGADOR %d: %c de %c\n", (i-3)/3 , data[i], data[i+1]);
+        if(converte_char_baralho(data[i] != MORTO))
+            printf("JOGADOR %d: %c de %c\n", (i-3)/3 , data[i], data[i+1]);
+        else 
+            printf("JOGADOR %d MORTO\n", (i-3)/3);
+
     }
     printf("\n");
     printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
@@ -220,7 +229,10 @@ void print_resultado_rodada(char *data, unsigned int n, int round){
     printf("GATO: %c de %c\n", data[0], data[1]);
     printf("VENCEDOR: JOGADOR %d - %c de %c \n", converte_char_int(data[3]), data[4], data[5]);
     for(int i = 7; i < n-1; i+=4){
-        printf("JOGADOR %d: %c de %c\n", converte_char_int(data[i]) , data[i+1], data[i+2]);
+        if(converte_char_int(data[i+1]) != MORTO)
+            printf("JOGADOR %d: %c de %c\n", converte_char_int(data[i]) , data[i+1], data[i+2]);
+        else 
+            printf("JOGADOR %d ESTÁ MORTO\n", converte_char_int(data[i]));
     }
     printf("\n");
     printf("*************************************\n");
@@ -231,16 +243,53 @@ void print_resultado_partida(char *data, unsigned int n, int maxHand){
     printf("\n!!!! RESULTADO PARTIDA COM MAO %d !!!!\n", maxHand);
     printf("\n");
     for(int i = 0; i < n-1; i+=5){
-        printf("JOGADOR %d:\n", converte_char_int(data[i]));
-        printf("    APOSTAS: Fazia %c\n", data[i+1]);
-        printf("    FEZ: %c\n", data[i+2]);
-        printf("    VIDAS AO FIM DA RODADA: %c\n", data[i+3]);
+        if(converte_char_int(data[i+1]) != MORTO){
+            printf("JOGADOR %d:\n", converte_char_int(data[i]));
+            printf("    APOSTAS: Fazia %c\n", data[i+1]);
+            printf("    FEZ: %c\n", data[i+2]);
+            printf("    VIDAS AO FIM DA RODADA: %c\n", data[i+3]);
+        }
+        else 
+            printf("JOGADOR %d ESTÁ MORTO\n", converte_char_int(data[i]));
+       
     }
     printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 }
 
+void print_fim_jogo(char *data, unsigned int n, int maxHand){
+    int maior_vida = converte_char_int(data[1]); 
+    int index_vencedor = 0; 
+    int vida_i; 
+    int empate = 0;
 
-//void print_resultado_partida()
+    printf("\n==== RESULTADO FINAL NA MAO %d ====\n", maxHand);
+    printf("\n");
+    printf("JOGADOR %d: Possui %d vidas\n", index_vencedor, maior_vida);
+    for(int i=3; i < n-1; i+=3){
+
+        vida_i = converte_char_int(data[i+1]);
+        
+        if(vida_i > maior_vida){
+            maior_vida = vida_i;
+            index_vencedor =  converte_char_int(data[i]);
+            empate = 0;
+
+        }
+        else{
+            if(vida_i == maior_vida){
+                empate = 1;
+            }
+        }
+
+        printf("JOGADOR %d: Possui %d vidas\n", converte_char_int(data[i]), vida_i);
+    }
+
+    if(empate)
+        printf("EMPATE! NINGUÉM GANHOU! :(\n");
+    else 
+        printf("JOGADOR %d GANHOU COM %d VIDAS! *foguinhos*\n", index_vencedor, maior_vida);
+    printf("\n");
+}
 
 char converte_numero_baralho(unsigned int i){
 
@@ -275,6 +324,9 @@ char converte_numero_baralho(unsigned int i){
         case 9: 
             return '3';
             break;
+        case 255:
+            return 'X';
+            break;
     }
 
     return '\0';
@@ -294,6 +346,9 @@ char converte_numero_naipe(unsigned int i){
             break; 
         case 3:
             return 'P';
+            break;
+        case 255:
+            return 'X';
             break;
     }
 
@@ -333,10 +388,14 @@ int converte_char_baralho(char i){
         case '3': 
             return 9;
             break;
+        case 'X':
+            return 255;
+            break;
     }
 
     return -1;
 }
+
 
 int converte_char_naipe(char i){
 
@@ -353,10 +412,60 @@ int converte_char_naipe(char i){
         case 'P':
             return 3;
             break;
+        case 'X':
+            return 255;
+            break;
     }
 
     return -1;
 }
+
+char *converte_char_naipe_string(char i){
+
+    switch(i){
+        case 'O':
+            return "OUROS";
+            break; 
+        case 'E':
+            return "ESPADAS";
+            break; 
+        case 'C':
+            return "COPAS";
+            break; 
+        case 'P':
+            return "PAUS";
+            break;
+        case 'X':
+            return "MORTO";
+            break;
+    }
+
+    return "UNKNOWN";
+}
+
+char *converte_int_naipe_string(int i){
+
+    switch(i){
+        case 0:
+            return "OUROS";
+            break; 
+        case 1:
+            return "ESPADAS";
+            break; 
+        case 2:
+            return "COPAS";
+            break; 
+        case 3:
+            return "PAUS";
+            break;
+        case 255:
+            return "MORTO";
+            break;
+    }
+
+    return "UNKNOWN";
+}
+
 
 int converte_char_int(char i){
     
@@ -391,7 +500,10 @@ int converte_char_int(char i){
         case '9':
             return 9;
             break;
-    }
+        case 'X':
+            return 255; 
+            break;
+    }   
 
     return -1;
 }
@@ -429,10 +541,51 @@ char converte_int_char(int i){
         case 9:
             return '9';
             break;
+        case 255:
+            return 'X';
+            break;
     }
 
     return -1;
 }
+
+void header_jogo_dane_se() {
+
+    printf("⠀                           ⠘⡀⠀⠀⠀JOGO: DANE-SE⠀⠀⠀⠀⠀ ⡜⠀⠀⠀\n");
+    printf("⠀⠀                          ⠀⠑⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡔⠁⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀                          ⠈⠢⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠴⠊⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀                         ⢸⠀⠀⠀⢀⣀⣀⣀⣀⣀⡀⠤⠄⠒⠈⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀                         ⠘⣀⠄⠊⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣤⣤⣶⣤⣤⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⣿⣿⡿⠋⠉⠛⠛⠛⠿⣿⠿⠿⢿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣿⣿⠟⠀⠀⠀⠀⠀⡀⢀⣽⣷⣆⡀⠙⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⣿⣿⣿⣷⠶⠋⠀⠀⣠⣤⣤⣉⣉⣿⠙⣿⠀⢸⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⠁⠀⠀⠴⡟⣻⣿⣿⣿⣿⣿⣶⣿⣦⡀⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢨⠟⡿⠻⣿⠃⠀⠀⠀⠻⢿⣿⣿⣿⣿⣿⠏⢹⣿⣿⣿⢿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣼⣷⡶⣿⣄⠀⠀⠀⠀⠀⢉⣿⣿⣿⡿⠀⠸⣿⣿⡿⣷⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡿⣦⢀⣿⣿⣄⡀⣀⣰⠾⠛⣻⣿⣿⣟⣲⡀⢸⡿⡟⠹⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠞⣾⣿⡛⣿⣿⣿⣿⣰⣾⣿⣿⣿⣿⣿⣿⣿⣿⡇⢰⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠀⣿⡽⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⠿⣍⣿⣧⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣷⣿⣿⣿⣿⣿⣿⣿⣷⣮⣽⣿⣷⣙⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⣹⡿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡧⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡆⠀⠀⠀⠀⠀⠀⠀⠉⠻⣿⣿⣾⣿⣿⣿⣿⣿⡶⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⡴⠞⠛⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠚⣿⣿⣿⠿⣿⣿⠿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⢀⣠⣤⠶⠚⠉⠉⠀⢀⡴⠂⠀⠀⠀⠀⠀⠀⠀⠀⢠⠀⠀⢀⣿⣿⠁⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠞⠋⠁⠀⠀⠀⠀⣠⣴⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⠀⠀⣾⣿⠋⠀⢠⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⡀⠀⠀⢀⣷⣶⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣆⣼⣿⠁⢠⠃⠈⠓⠦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⣿⣿⡛⠛⠿⠿⠿⠿⠿⢷⣦⣤⣤⣤⣦⣄⣀⣀⠀⢀⣿⣿⠻⣿⣰⠻⠀⠸⣧⡀⠀⠉⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠛⢿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠙⠛⠿⣦⣼⡏⢻⣿⣿⠇⠀⠁⠀⠻⣿⠙⣶⣄⠈⠳⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠈⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⣐⠀⠀⠀⠈⠳⡘⣿⡟⣀⡠⠿⠶⠒⠟⠓⠀⠹⡄⢴⣬⣍⣑⠢⢤⡀⠀⠀⠀⠀⠀⠀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢀⣀⠐⠲⠤⠁⢘⣠⣿⣷⣦⠀⠀⠀⠀⠀⠀⠙⢿⣿⣏⠉⠉⠂⠉⠉⠓⠒⠦⣄⡀⠀⠀\n");
+    printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠀⠀⠈⣿⣿⣷⣯⠀⠀⠀⠀⠀⠀⠀⠀⠉⠻⢦⣷⡀⠀⠀⠀⠀⠀⠀⠉⠲⣄⠀\n");
+    printf("⠠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢦⠀⢹⣿⣏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢻⣷⣄⠀⠀⠀⠀⠀⠀⠈⠳\n");
+    printf("⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⣸⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣽⡟⢶⣄⠀⠀⠀⠀⠀\n");
+    printf("⠯⠀⠀⠀⠒⠀⠀⠀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⡄⠈⠳⠀⠀⠀⠀\n");
+    printf("⠀⠀⢀⣀⣀⡀⣼⣤⡟⣬⣿⣷⣤⣀⣄⣀⡀⠀⠀⠀⠀⠀⠀⠈⣿⣿⡄⣉⡀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⣿⣿⣄⠀⣀⣀⡀⠀\n");
+}
+
 
 
 /******************************** PARA DELEÇÃO ********************************/
