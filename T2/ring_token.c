@@ -104,18 +104,26 @@ void gera_mensagem_resultado(char *data, unsigned int *tam, struct carta_t *r, u
     
     nm = r[ganhador].num; 
     np = r[ganhador].naipe; 
-    printf("%hhd %hhd\n", nm, np);
     memset(buff, 0, 5);
     snprintf(buff, 5,"%c%c%c|", converte_int_char(ganhador), converte_numero_baralho(nm), converte_numero_naipe(np));
     strcat(data, buff);
 
     for(int i=0; i < n; ++i){
-        printf("CONCAT: %s", data);
         memset(buff, 0, 5);
         nm = r[i].num; 
         np = r[i].naipe; 
-        printf("%hhd %hhd\n", nm, np);
         snprintf(buff, 5 ,"%c%c%c|",converte_int_char(i), converte_numero_baralho(nm), converte_numero_naipe(np));
+        strcat(data, buff);
+    }
+    *tam = strlen(data); 
+}
+
+void gera_mensagem_partida(char *data, unsigned int *tam, uint8_t *apostas, uint8_t *vitorias, uint8_t *vidas , uint8_t n){
+    char buff[6];
+
+    for(int i=0; i < n; ++i){
+        memset(buff, 0, 6);
+        snprintf(buff, 6 ,"%c%c%c%c|",converte_int_char(i), converte_int_char(apostas[i]), converte_int_char(vitorias[i]), converte_int_char(vidas[i]));
         strcat(data, buff);
     }
     *tam = strlen(data); 
@@ -220,7 +228,7 @@ int main(int argc, char *argv[]){
     if(!bind_socket(sock, &my_addr, index))
         perror("Falha no bind do socket\n");
     
-    printf("Socket para %d: %d\n", index, sock);
+    //printf("Socket para %d: %d\n", index, sock);
 
     socklen_t addr_size;
 
@@ -239,7 +247,7 @@ int main(int argc, char *argv[]){
         strcpy(node_token.token, token);
 
         vidas = malloc(sizeof(uint8_t)*NUM_NODES);
-        memset(vidas, 3, NUM_NODES);
+        memset(vidas, 4, NUM_NODES);
 
         apostas = malloc(sizeof(uint8_t)*NUM_NODES);
         memset(apostas, 0, NUM_NODES);
@@ -256,14 +264,12 @@ int main(int argc, char *argv[]){
 
     }
 
-    int  cartas_mao = 1;
-    int aposta; 
-    dest = 0;
+    struct carta_t carta, gato; 
+    int cartas_mao = 1; 
     int round = 1;
-    struct carta_t carta;
-    struct carta_t gato; 
-    uint8_t ganhador;
-
+    int aposta;     
+    int ganhador;
+    uint8_t contVidas = 4;
 
     while(1){
 
@@ -285,7 +291,7 @@ int main(int argc, char *argv[]){
                                     gato = carta_aleatoria(baralho);
                                     deck = malloc(cartas_mao*sizeof(struct carta_t));
                                     gera_cartas_aleatorias(deck, baralho, cartas_mao);
-                                    print_deck(deck, cartas_mao);
+                                    print_mao(deck, cartas_mao, round);
                                 }
                                 dest++;
                                 
@@ -295,7 +301,7 @@ int main(int argc, char *argv[]){
                                         gera_cartas_aleatorias(temp_deck, baralho, cartas_mao); //Gera as cartas do deck marcando como usada no baralho
                                         memset(data_buffer, 0, MAX_DATA_LENGHT+1);
                                         mao_baralho(temp_deck, cartas_mao, &message.size, data_buffer);
-                                        printf("Deck para %d: %s (size  %d)\n", dest, data_buffer, message.size);
+                                        //printf("Deck para %d: %s (size  %d)\n", dest, data_buffer, message.size);
                                         preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, SHUFFLE_FLAG , round, cartas_mao, dest);
                                         free(temp_deck);
 
@@ -307,13 +313,13 @@ int main(int argc, char *argv[]){
                         
                         case BET_FLAG:
                             {
-                                printf("\n*** APOSTA ***\n");
+                                printf("\n****** FAZER APOSTA PARTIDA %d ******\n", cartas_mao);
                                 aposta = apostar(cartas_mao);
                                 printf("Apostado %d\n", aposta);
                                 memset(data_buffer, 0, MAX_DATA_LENGHT+1);
                                 snprintf(data_buffer, 3 ,"%c|", converte_int_char(aposta));
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, cartas_mao, 1);
-                                printf("**************\n");                  
+                                printf("*************************************\n");
                             }
                             break; 
                         
@@ -326,11 +332,13 @@ int main(int argc, char *argv[]){
                 
                         case MATCH_FLAG:
                             {
-                                printf("*** HAND CARDS ***\n");
-                                print_deck(deck, message.num_cards);
-                                printf("******************\n");
+                                memset(data_buffer, 0, MAX_DATA_LENGHT+1);
+                                snprintf(data_buffer, 4,"%c%c|", converte_numero_baralho(gato.num), converte_numero_naipe(gato.naipe));
+                                print_mesa(data_buffer,3);
+                                
+                                print_mao(deck, message.num_cards, round);
 
-                                printf("Escolha a carta:\n");
+                                printf("Escolha uma carta para jogar\n");
                                 opt = escolhe_cartas(deck, message.num_cards);
                                 carta = deck[opt]; 
                                 memset(data_buffer, 0, MAX_DATA_LENGHT+1);
@@ -351,8 +359,7 @@ int main(int argc, char *argv[]){
                         case MATCH_RESULTS_FLAG:
                             {
                                 memset(data_buffer, 0, MAX_DATA_LENGHT + 1);
-                                //gera_mensagem_partida(data_buffer, &message.size, vidas, 4);
-                                /* Printar o resultado da ultima rodada*/
+                                gera_mensagem_partida(data_buffer, &message.size, apostas, vitorias, vidas, 4);
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, MATCH_RESULTS_FLAG, round, cartas_mao, 1); //Na hora de preparar a mensagem, se atentar que round e n estão com 1 a mais (uma checagem ternaria já ajuda)
                             }
                     }                
@@ -374,7 +381,7 @@ int main(int argc, char *argv[]){
                         
                         case BET_FLAG:
                             {
-                                printf("\n*** APOSTA ***\n");
+                                printf("\n****** FAZER APOSTA PARTIDA %d ******\n", cartas_mao);
                                 char bet[3];
                                 aposta = apostar(cartas_mao);
                                 printf("Apostado %d \n", aposta);
@@ -382,7 +389,7 @@ int main(int argc, char *argv[]){
                                 snprintf(bet, 3 ,"%c|", converte_int_char(aposta));
                                 strcat(data_buffer, bet);
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, BET_FLAG, round, cartas_mao, next_node_index);
-                                printf("**************\n");
+                                printf("*************************************\n");
 
                             }
                             break; 
@@ -396,11 +403,9 @@ int main(int argc, char *argv[]){
                         case MATCH_FLAG: 
                             {
                                 char play[4];
-                                printf("*** HAND CARDS ***\n");
-                                print_deck(deck, cartas_mao);
-                                printf("******************\n");
 
-                                printf("Escolha a carta:\n");
+                                print_mao(deck, message.num_cards, round);
+                                printf("Escolha uma carta para jogar\n");
                                 opt = escolhe_cartas(deck, cartas_mao);
                                 carta = deck[opt]; 
                                 memcpy(data_buffer, message.data, MAX_DATA_LENGHT+1);
@@ -473,8 +478,7 @@ int main(int argc, char *argv[]){
                 case SHUFFLE_FLAG: 
                     {                
                         if(message.dest == 0 && index == 0){
-                            printf("%s\n", message.data);
-
+                            //printf("%s\n", message.data);
                             if(dest == 3){
                                 MASTER_FLAG = BET_FLAG; 
                                 dest = 0;   
@@ -482,7 +486,7 @@ int main(int argc, char *argv[]){
                         }
                         else if (message.dest == index){
                             deck = vetor_cartas(message.data, message.size, message.num_cards);
-                            print_deck(deck, message.num_cards);
+                            print_mao(deck, message.num_cards, round);
                         } 
                     }
                     
@@ -490,25 +494,30 @@ int main(int argc, char *argv[]){
 
                 case BET_FLAG:
                     {
-                        print_apostas(message.data, message.size - 1, cartas_mao);
-                        printf("\n");
-
                         if(message.dest == 0 && index == 0){
+                            printf("&&&&&& TODAS AS APOSTAS DA MESA &&&&&\n");  
+                            print_apostas(message.data, message.size - 1, cartas_mao);
+                            printf("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n");  
                             converte_apostas(message.data, message.size, apostas, 4);
                             MASTER_FLAG = ALL_BETS_FLAG;
+                        }
+                        else{
+                            print_apostas(message.data, message.size - 1, cartas_mao);
+                            printf("\n");
                         }
                     }
                     break; 
 
                 case ALL_BETS_FLAG:
                     {
-                        printf("------- TODAS AS APOSTAS DA MESA ------\n");  
-                        print_apostas(message.data, message.size - 1, cartas_mao);
-                        printf("-----------------------------------------\n");  
-
+                        
                         if(message.dest == 0 && index == 0){
                             MASTER_FLAG = MATCH_FLAG;
-                            print_mesa(message.data, message.size - 1);
+                        }
+                        else{
+                            printf("&&&&&& TODAS AS APOSTAS DA MESA &&&&&\n");  
+                            print_apostas(message.data, message.size - 1, cartas_mao);
+                            printf("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n");  
                         }
                     }
                     break; 
@@ -520,7 +529,6 @@ int main(int argc, char *argv[]){
                             converte_rodada(message.data, message.size, rodada, 4);
                             print_deck(rodada, 4);
                             ganhador  = calcula_vitoria(rodada, vitorias, 4, gato);
-
                             MASTER_FLAG = RESULTS_FLAG;
                         }
                     }
@@ -533,19 +541,11 @@ int main(int argc, char *argv[]){
                         if(message.dest == 0 && index == 0){
 
                             if(round == cartas_mao){
-                                round = 1; 
-                                
-                                if(cartas_mao ==  MAX_CARTAS_MAO){
-                                     cartas_mao = 1; 
-                                }
-                                else{
-                                     cartas_mao++;
-                                }
-                                
                                 descontar_vidas_perdidas(vidas, apostas, vitorias, 4);
-                                /* Calcular vidas de cada candidato*/
-                                /* Resetar valores vitórias */
 
+                                for(int i=0; i < 4; ++i)
+                                    printf("%d tem %d vitorias, apostou em %d e tem %d vidas\n", i, vitorias[i], apostas[i], vidas[i]);                             
+                                
                                 MASTER_FLAG = MATCH_RESULTS_FLAG; 
                             }
                             else{
@@ -557,6 +557,10 @@ int main(int argc, char *argv[]){
                     break;
                 case MATCH_RESULTS_FLAG: 
                     {
+                        //printf("@@@@@ %s @@@@\n", message.data);
+                        contVidas = vida_final_partida(message.data, message.size-1, contVidas, index, cartas_mao);
+                        print_resultado_partida(message.data, message.size-1, cartas_mao);
+
                         free(deck);
                         if(message.dest == 0 && index == 0){
                                 printf("Continuar a jogar?\n");
@@ -571,12 +575,17 @@ int main(int argc, char *argv[]){
                                     free(rodada);
                                 }
                                 else{
+                                    round = 1; 
+                                
+                                    if(cartas_mao ==  MAX_CARTAS_MAO)
+                                         cartas_mao = 1; 
+                                    else
+                                         cartas_mao++;
+
                                     MASTER_FLAG = SHUFFLE_FLAG;
                                     memset(baralho, 0, TAM_BARALHO*sizeof(unsigned int));
+                                    memset(vitorias, 0, NUM_NODES*sizeof(uint8_t));
                                 }
-                        }
-                        else{
-                            /* Printar o resultado da ultima rodada*/
                         }
                     }
                     break; 

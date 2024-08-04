@@ -41,11 +41,17 @@ void converte_rodada(char *data, unsigned int n, struct carta_t *r, unsigned int
 
 void descontar_vidas_perdidas(uint8_t *vidas, uint8_t *apostas, uint8_t *vitorias, uint8_t n);
 
+int vida_final_partida(char *data, unsigned int n, int checkpointVidas, unsigned int index, unsigned int maxHand);
+
 void print_apostas(char *apostas, unsigned int n , unsigned maxHand);
+
+void print_mao(struct carta_t *mao, unsigned int n, unsigned int round);
 
 void print_mesa(char *data, unsigned int n);
 
 void print_resultado_rodada(char *data, unsigned int n, int round);
+
+void print_resultado_partida(char *data, unsigned int n, int maxHand);
 
 char converte_numero_naipe(unsigned int i);
 

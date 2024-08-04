@@ -85,7 +85,6 @@ void converte_rodada(char *data, unsigned int n, struct carta_t *r, unsigned int
     unsigned int index = 0;
     printf("%s\n",data);
     for(int i=3; i < n && index < k; i+=3){
-        printf("Convertendo %c e %c\n", data[i], data[i+1]);
         r[index].num   = converte_char_baralho(data[i]);
         r[index].naipe = converte_char_naipe(data[i+1]);
         index++;
@@ -152,27 +151,57 @@ void descontar_vidas_perdidas(uint8_t *vidas, uint8_t *apostas, uint8_t *vitoria
             vidas[i] = 0;
         else 
             vidas[i] -= desconto;
-
     }
+}
+
+int vida_final_partida(char *data, unsigned int n, int checkpointVidas, unsigned int index, unsigned int maxHand){
+    int vidaFinalPartida;
+    int indexData;
+
+     for(int i = 0; i < n-1; i+=5){
+       indexData = converte_char_int(data[i]);
+
+       if(indexData == index){
+            vidaFinalPartida = converte_char_int(data[i+3]);
+
+            printf("\n|||||||||||||||||||||||||||||||||||||\n");
+            printf("\nVIDAS PERDIDAS PARTIDA COM MAO %d: %d\n", maxHand, checkpointVidas - vidaFinalPartida);
+            printf("\n|||||||||||||||||||||||||||||||||||||\n");
+
+            return vidaFinalPartida;
+       }
+    }
+
+    perror("ERRO: Indíce não encontrado\n");
+
+    return -1;
+}
+
+void print_mao(struct carta_t *mao, unsigned int n, unsigned int round){
+        
+    printf("\n###### CARTAS NA MAO - RODADA %d ######\n", round);  
+    printf("\n");
+    print_deck(mao, n);
+    printf("\n");
+    printf("######################################\n");  
+
 }
 
 void print_apostas(char *apostas, unsigned int n , unsigned maxHand){
     
-    printf("\n---------- APOSTAS COM MAO %d ----------\n", maxHand);  
+    printf("\n--------- APOSTAS COM MAO %d --------\n", maxHand);  
     printf("\n");    
     for(int i = 0; i < n; i+=2){
         printf("JOGADOR %d diz que faz %d\n", i/2, converte_char_int(apostas[i]));
     }
     printf("\n");
-    printf("-----------------------------------------\n");
+    printf("-------------------------------------\n");
 
 }
 
-
-
 void print_mesa(char *data, unsigned int n){
 
-    printf("\n---------- MESA ----------\n");  
+    printf("\n$$$$$$$$$$$$$$$$ MESA $$$$$$$$$$$$$$$\n");  
     printf("\n");
     printf("GATO: %c de %c\n", data[0], data[1]);
 
@@ -180,13 +209,13 @@ void print_mesa(char *data, unsigned int n){
         printf("JOGADOR %d: %c de %c\n", (i-3)/3 , data[i], data[i+1]);
     }
     printf("\n");
-    printf("--------------------------\n");
+    printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
 
 }
 
 void print_resultado_rodada(char *data, unsigned int n, int round){
 
-    printf("\n********** RESULTADO RODADA %d **********\n", round);
+    printf("\n******* RESULTADO RODADA %d *******\n", round);
     printf("\n");
     printf("GATO: %c de %c\n", data[0], data[1]);
     printf("VENCEDOR: JOGADOR %d - %c de %c \n", converte_char_int(data[3]), data[4], data[5]);
@@ -194,8 +223,22 @@ void print_resultado_rodada(char *data, unsigned int n, int round){
         printf("JOGADOR %d: %c de %c\n", converte_char_int(data[i]) , data[i+1], data[i+2]);
     }
     printf("\n");
-    printf("*****************************************\n");
+    printf("*************************************\n");
 }
+
+void print_resultado_partida(char *data, unsigned int n, int maxHand){
+
+    printf("\n!!!! RESULTADO PARTIDA COM MAO %d !!!!\n", maxHand);
+    printf("\n");
+    for(int i = 0; i < n-1; i+=5){
+        printf("JOGADOR %d:\n", converte_char_int(data[i]));
+        printf("    APOSTAS: Fazia %c\n", data[i+1]);
+        printf("    FEZ: %c\n", data[i+2]);
+        printf("    VIDAS AO FIM DA RODADA: %c\n", data[i+3]);
+    }
+    printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+}
+
 
 //void print_resultado_partida()
 
