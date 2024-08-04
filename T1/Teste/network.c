@@ -1,5 +1,53 @@
 #include "network.h"
 
+struct networkFrame gerar_mensagem_lista(uint8_t seq) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = 63;
+        message.seq    = seq; 
+        message.type   = LISTA; //Só pra testar
+        char msg[MAX_DATA_LENGHT] = "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL";
+        memcpy(&message.data, msg, MAX_DATA_LENGHT);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+}
+
+struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = tam;
+        message.seq    = seq; 
+        message.type   = BAIXAR; //Só pra testar
+        memset(message.data, 0, MAX_DATA_LENGHT);
+        memcpy(&message.data, arqNome, tam);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+
+}
+
+struct networkFrame gerar_mensagem_ack(uint8_t seq) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = 63;
+        message.seq    = seq; 
+        message.type   = ACK; //Só pra testar
+        char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        memcpy(&message.data, msg, MAX_DATA_LENGHT);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+}
+
+// recebe um do tipo lista e imprime na tela o nome do arquivo recebido
+void receber_mensagem_mostrar_tela(struct networkFrame frame) {
+        printf("%s", frame.data);
+}
+
 void printBinary(uint8_t n) {
         // Define the number of bits in an unsigned int
         unsigned int numBits = sizeof(uint8_t) * 8;

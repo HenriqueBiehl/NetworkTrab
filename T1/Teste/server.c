@@ -156,7 +156,7 @@ int main(){
         printf("sckt: %d\n", sckt);
         
         struct sockaddr_ll client_addr;
-        socklen_t addr_len = sizeof(struct sockaddr_in);
+        socklen_t addr_len = sizeof(struct sockaddr_ll);
 
         //int ret = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
         int ret;
@@ -250,6 +250,7 @@ int main(){
                                                 fread(buffer, sizeof(char), MAX_DATA_LENGHT , arq);
                                                 struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, ret);
                                                 printf("enviando mensagem_dados %d\n", i);
+                                                printFrame(mensagem_dados);
                                                 //memcpy(msg, &mensagem_dados, FRAME_SIZE);
                                                 ret = sendto(sckt, (char*)&mensagem_dados, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, sizeof(client_addr));
                                                 if(ret < 0){

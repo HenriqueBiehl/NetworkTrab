@@ -1,3 +1,6 @@
+#ifndef NETWORK_H
+#define NETWORK_H
+
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
@@ -44,6 +47,14 @@ int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido);
 
 FILE *abrir_arquivo(char *nome, char *tipo);
 
+struct networkFrame gerar_mensagem_lista(uint8_t seq);
+
+struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam);
+
+struct networkFrame gerar_mensagem_ack(uint8_t seq);
+
+void receber_mensagem_mostrar_tela(struct networkFrame frame);
+
 /*
         Lista os conteúdos de um diretório e envia para um arquivo temporário "lista"         
 */
@@ -54,3 +65,5 @@ void lista_conteudos();
         em um arquivo temporário "descritor"
 */
 void descritor_arquivo(char *nomeArquivo);
+
+#endif // NETWORK_H

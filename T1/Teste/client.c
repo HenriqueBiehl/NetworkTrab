@@ -8,6 +8,7 @@
 #include <net/if.h> 
 #include <stdint.h>
 
+#include "comandos.h"
 #include "network.h"
 
 /*
@@ -73,219 +74,38 @@ void copiar_frame_buffer(char *buffer, struct networkFrame frame){
         buffer[67] = frame.crc8;
 }
 
-// recebe um do tipo lista e imprime na tela o nome do arquivo recebido
-void receber_mensagem_mostrar_tela(struct networkFrame frame) {
-        printf("%s", frame.data);
-}
-
-struct networkFrame gerar_mensagem_lista(uint8_t seq) {
-
-        struct networkFrame message; 
-        message.start  = 0x7e;
-        message.size   = 63;
-        message.seq    = seq; 
-        message.type   = LISTA; //Só pra testar
-        char msg[MAX_DATA_LENGHT] = "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL";
-        memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
-
-        return message;
-}
-
-struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam) {
-
-        struct networkFrame message; 
-        message.start  = 0x7e;
-        message.size   = tam;
-        message.seq    = seq; 
-        message.type   = BAIXAR; //Só pra testar
-        memset(message.data, 0, MAX_DATA_LENGHT);
-        memcpy(&message.data, arqNome, tam);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
-
-        return message;
-
-}
-
-struct networkFrame gerar_mensagem_ack(uint8_t seq) {
-
-        struct networkFrame message; 
-        message.start  = 0x7e;
-        message.size   = 63;
-        message.seq    = seq; 
-        message.type   = ACK; //Só pra testar
-        char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-        memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
-
-        return message;
-}
 
 int main(){
 
         int sckt = cria_raw_socket();
-        struct sockaddr_ll server_addr; 
-        //char msg[MAX_DATA_LENGHT] = "000000000000000000000000000000000000000000000000000000000000000";
-        char transmission[FRAME_SIZE];
 
+        //memset(&server_addr, 0, sizeof(server_addr));
         bind_raw_socket(sckt, "lo");
         setar_modo_promiscuo(sckt, "lo");
 
         printf("sckt: %d\n", sckt);
 
-        struct networkFrame message; 
-
-        memcpy(transmission, &message, FRAME_SIZE);
-
         //Procedimento para poder enviar informações
+        //
+        struct sockaddr_ll server_addr = {0};
         int ifindex = if_nametoindex("lo");
         server_addr.sll_ifindex = ifindex;
         server_addr.sll_family = AF_PACKET;
+        server_addr.sll_protocol = htons(ETH_P_ALL);
 
-        int seq = 0;
-
-        printf("Envie uma mensagem ao servidor (listar, baixar \"arquivo\"):\n");
+        uint8_t comando;
         while (1) {
-                printf("Esperando comando: ");
-                char input[128];
-                scanf("%s", input);
-                //printf("%s", input);
-                if (strncmp(input, "listar", 6) == 0) {
-                        printf("Listando diretorio:\n");
-                        message = gerar_mensagem_lista(seq++);
-                        int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                        if (ret < 0) {
-                                fprintf(stderr, "Falha ao fazer sendto()");
-                                return -1;
-                        } else {
-                                printf("Mensagem enviada, aguardando servidor\n");
-                        }
-                        // Enviar a mensagem para listar
-                } else if (strncmp(input, "baixar", 6) == 0) {
-                        char nomeArquivo[64]; 
-                        printf("Digite o nome do arquivo:\n");
-                        getchar();
-                        fgets(nomeArquivo, MAX_DATA_LENGHT, stdin);
-                        printf("%s", nomeArquivo);
-                        for(int i=0; i < strlen(nomeArquivo); ++i){
-                                printf("%d = %c\n", i, nomeArquivo[i]);
-                        }
-                        if(nomeArquivo[strlen(nomeArquivo)-1] == '\n'){
-                                nomeArquivo[strlen(nomeArquivo)-1] = '\0';
-                        }
-
-                        for(int i=0; i < strlen(nomeArquivo); ++i){
-                                printf("%d = %c\n", i, nomeArquivo[i]);
-                        }
-
-                        printf("%s", nomeArquivo);
-                        message = gerar_mensagem_baixar(seq, nomeArquivo, strlen(nomeArquivo));
-
-                        int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                        if (ret < 0) {
-                                fprintf(stderr, "Falha ao fazer sendto()");
-                                return -1;
-                        } else {
-                                printf("Mensagem enviada, aguardando servidor\n");
-                        }
-
-                        // Enviar a mensagem para baixar
-                } else if (strcmp(input, "exit") == 0) {
-                        exit(0);
-                } else {
-                        printf("Comando inexistente.\n");
-                        exit(0);
-                }
-
-                struct networkFrame recieved;
-                socklen_t add_len = sizeof(struct sockaddr_in);
-                memset(&recieved, 0, FRAME_SIZE);
-                memset(&message, 0, FRAME_SIZE);
-
-                int rec;
-                //while(1){
-                rec = recvfrom(sckt, (char *)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                if (rec < 0) {
-                        perror("Erro ao receber mensagem");
-                        close(sckt);
-                        return -1;
-                } else {
-                        printFrame(recieved);
-                }
-                //}
-
-                if(recieved.start == START){
-                        printFrame(recieved);
-                        switch (recieved.type) {
-                                case (MOSTRA_NA_TELA):
-                                        printf("Recebi MOSTRA_NA_TELA\n");
-                                        while (recieved.type != FIM_TX) {
-                                                printf("Mostrando...\n");
-                                                receber_mensagem_mostrar_tela(recieved);
-                                                rec = recvfrom(sckt, (char*)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                                                if (rec < 0) {
-                                                        perror("Erro ao receber mensagem");
-                                                        close(sckt);
-                                                        /* Caso de NACK*/
-                                                        return -1;
-                                                }
-                                        }
-
-                                        printf("Fim da transmissao, listado o diretorio\n");
-                                        printf("enviando ACK\n");
-
-                                        //printFrame(recieved);
-                                        message = gerar_mensagem_ack(seq++);
-                                        int ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                                        if (ret < 0) {
-                                                fprintf(stderr, "Falha ao fazer sendto()");
-                                                return -1;
-                                        } else {
-                                                printFrame(message);
-                                                printf("Ack enviado");
-                                        }
-
-                                        break;
-                                case (DADOS):
-                                        printf("Recebi DADOS\n");
-                                        FILE *baixado = fopen("baixado.mp4", "wb+");
-                                        int count = 1;
-                                        while (recieved.type != FIM_TX) {
-                                                if (recieved.start != START) {
-                                                        printf("mensagem invalida............\n");
-                                                        continue;
-                                                }
-                                                printf("Baixando(%d)...\n", count++);
-                                                //printFrame(recieved);
-                                                fwrite(recieved.data, sizeof(char), recieved.size, baixado);
-                                                rec = recvfrom(sckt, (char*)&recieved, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                                                if (rec < 0) {
-                                                        perror("Erro ao receber mensagem");
-                                                        close(sckt);
-                                                        /* Caso de NACK*/
-                                                        return -1;
-                                                }
-                                        }
-                                        if (verifica_crc8((uint8_t*)&recieved, sizeof(recieved) - 1, recieved.crc8)) {
-                                                printf("CRC deu certo\n");
-                                        } else {
-                                                printf("CRC deu errado\n");
-                                        }
-                                        printf("Recebeu o FIM_TX, fechando o arquivo ....n");
-                                        fclose(baixado);
-
-                                        //Enviando ack
-                                        message = gerar_mensagem_ack(seq++);
-                                        ret = sendto(sckt, (char*)&message, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                                        if (ret < 0) {
-                                                fprintf(stderr, "Falha ao fazer sendto()");
-                                                return -1;
-                                        } else {
-                                                printFrame(message);
-                                                printf("Ack enviado");
-                                        }
-                                        printFrame(recieved);
-                        }
+                comando = get_comando();
+                switch (comando) {
+                        case (CMD_LISTAR):
+                                client_listar(sckt, server_addr);
+                                break;
+                        case (CMD_BAIXAR):
+                                client_baixar(sckt, server_addr);
+                                break;
+                        case (CMD_DESCONHECIDO):
+                                printf("Comando inválido, tente novamente\n");
+                                break;
                 }
         }
         close(sckt);
