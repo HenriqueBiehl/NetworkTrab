@@ -37,6 +37,12 @@ struct __attribute__((packed)) networkFrame {
         uint8_t crc8;
 };
 
+int cria_raw_socket();
+
+void bind_raw_socket(int sckt, char *netInterface);
+
+void setar_modo_promiscuo(int sckt, char *netInterface);
+
 void printBinary(uint8_t n);
 
 void printFrame(struct networkFrame frame);
@@ -47,11 +53,21 @@ int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido);
 
 FILE *abrir_arquivo(char *nome, char *tipo);
 
+int sendto_verify(int sckt, const void *message, size_t length, struct sockaddr *dest_addr, socklen_t dest_len);
+
 struct networkFrame gerar_mensagem_lista(uint8_t seq);
 
 struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam);
 
 struct networkFrame gerar_mensagem_ack(uint8_t seq);
+
+struct networkFrame gerar_mensagem_enviar_mostra_tela(char *nome, uint8_t seq);
+
+struct networkFrame gerar_mensagem_erro(uint8_t seq, char *erro);
+
+struct networkFrame gerar_mensagem_dados(uint8_t seq, char *data, uint8_t size);
+
+struct networkFrame gerar_mensagem_fim_tx(uint8_t seq);
 
 void receber_mensagem_mostrar_tela(struct networkFrame frame);
 
