@@ -31,11 +31,173 @@ void gera_cartas_aleatorias(struct carta_t *v, unsigned int *baralho, unsigned i
 void print_deck(struct carta_t *v, unsigned int n){
 
     for(int i=0; i < n; ++i){
-        if(v[i].num != 10)
+        if(v[i].num != USADA)
             printf("[%d] - %c de %c| ", i+1, converte_numero_baralho(v[i].num), converte_numero_naipe(v[i].naipe));
     }
     printf("\n");
 }
+
+struct carta_t *vetor_cartas(char *data, unsigned int n, uint8_t num_cards){
+    struct carta_t *v; 
+    unsigned int index = 0;
+    
+    //printf("Convertendo deck\n");
+
+    v = malloc(num_cards*sizeof(struct carta_t));
+    
+    for(int i = 0; i < n && index < num_cards; i+=3){
+        //printf("i:%c e i+1:%c\n", data[i], data[i+1]);
+        v[index].num = converte_char_baralho(data[i]); 
+        v[index].naipe = converte_char_naipe(data[i+1]);
+        index++;
+    }
+
+    return v;
+} 
+
+/* Converte o vetor deck para uma string formatada em cards.data. Recebe o ponteo de cards.size para salvar o tamanho*/
+void mao_baralho(struct carta_t *c, int n, unsigned int *size, char *str){
+    int msg_index = 0;
+    struct carta_t x; 
+    
+    for(int i =0; i < n; ++i){
+        x = c[i];
+        str[msg_index] = converte_numero_baralho(x.num); 
+        str[msg_index+1] = converte_numero_naipe(x.naipe);
+        str[msg_index+2] = '|';
+        msg_index += 3;
+    }
+
+    *size = msg_index;
+    str[msg_index] = '\0';
+}
+
+void converte_apostas(char *data, unsigned int n, uint8_t *a, unsigned int k){
+    unsigned int index = 0;
+
+    for(int i=0; i < n && index < k; i+=2){
+        a[index] = converte_char_int(data[i]);
+        index++;
+    }
+}
+
+void converte_rodada(char *data, unsigned int n, struct carta_t *r, unsigned int k){
+    unsigned int index = 0;
+    printf("%s\n",data);
+    for(int i=3; i < n && index < k; i+=3){
+        printf("Convertendo %c e %c\n", data[i], data[i+1]);
+        r[index].num   = converte_char_baralho(data[i]);
+        r[index].naipe = converte_char_naipe(data[i+1]);
+        index++;
+    }
+}
+
+uint8_t calcula_vitoria(struct carta_t *r, uint8_t *v, unsigned int n, struct carta_t gato){
+    unsigned int index_highest = 0;
+    struct carta_t highest_card = r[0]; 
+
+    if(highest_card.num == gato.num && highest_card.naipe == PAUS){
+        v[index_highest]++;
+        return index_highest;
+    }
+
+    for(int i=1; i < n; ++i){
+        if(r[i].num != MORTO){
+
+            //Verifica se a carta atual não é um gato de Paus (carta mais forte e imbatível do jogo)
+            if(r[i].num == gato.num){
+                if(r[i].naipe == PAUS){
+                    v[i]++;
+                    return i;
+                }
+            }
+
+            //Verifica se a carta r não é maior que a maior carta atual (que não pode ser o gato)
+            if(r[i].num > highest_card.num && highest_card.num != gato.num){
+                highest_card = r[i];
+                index_highest = i;
+            }
+            else{
+                //Verifica se as cartas não estão "empatadas" em seus valores
+                if(r[i].num == highest_card.num){
+                    //Se o naipe de r[i] for maior que o naipe de highest_cart r[i] passa a ser a maior carta 
+                    if(r[i].naipe > highest_card.naipe){
+                        highest_card = r[i];
+                        index_highest = i;                 
+                    }
+                }
+            }
+
+        }
+    }
+
+    v[index_highest]++;
+
+    return index_highest;
+}
+
+void descontar_vidas_perdidas(uint8_t *vidas, uint8_t *apostas, uint8_t *vitorias, uint8_t n){
+    uint8_t desconto; 
+
+    for(int i = 0; i < n; ++i){
+        
+        //Para evitar dar numero negativo
+        if(vitorias[i] > apostas[i])
+            desconto = vitorias[i] - apostas[i];
+        else 
+            desconto = apostas[i] - vitorias[i];
+
+
+        if(desconto > vidas[i])
+            vidas[i] = 0;
+        else 
+            vidas[i] -= desconto;
+
+    }
+}
+
+void print_apostas(char *apostas, unsigned int n , unsigned maxHand){
+    
+    printf("\n---------- APOSTAS COM MAO %d ----------\n", maxHand);  
+    printf("\n");    
+    for(int i = 0; i < n; i+=2){
+        printf("JOGADOR %d diz que faz %d\n", i/2, converte_char_int(apostas[i]));
+    }
+    printf("\n");
+    printf("-----------------------------------------\n");
+
+}
+
+
+
+void print_mesa(char *data, unsigned int n){
+
+    printf("\n---------- MESA ----------\n");  
+    printf("\n");
+    printf("GATO: %c de %c\n", data[0], data[1]);
+
+    for(int i = 3; i < n-1; i+=3){
+        printf("JOGADOR %d: %c de %c\n", (i-3)/3 , data[i], data[i+1]);
+    }
+    printf("\n");
+    printf("--------------------------\n");
+
+}
+
+void print_resultado_rodada(char *data, unsigned int n, int round){
+
+    printf("\n********** RESULTADO RODADA %d **********\n", round);
+    printf("\n");
+    printf("GATO: %c de %c\n", data[0], data[1]);
+    printf("VENCEDOR: JOGADOR %d - %c de %c \n", converte_char_int(data[3]), data[4], data[5]);
+    for(int i = 7; i < n-1; i+=4){
+        printf("JOGADOR %d: %c de %c\n", converte_char_int(data[i]) , data[i+1], data[i+2]);
+    }
+    printf("\n");
+    printf("*****************************************\n");
+}
+
+//void print_resultado_partida()
 
 char converte_numero_baralho(unsigned int i){
 
@@ -228,3 +390,32 @@ char converte_int_char(int i){
 
     return -1;
 }
+
+
+/******************************** PARA DELEÇÃO ********************************/
+
+/*struct message_frame seta_mensagem_shuffle(unsigned int *baralho, int dest_index, uint8_t round, int n){
+    struct message_frame cards; //Frame com as cartas a serem enviadas
+
+    struct carta_t *deck; //Vetor que representará a 'mão' de cartas 
+
+    deck = malloc(n*sizeof(struct carta_t)); //Aloca o "deck" que será enviado 
+    gera_cartas_aleatorias(deck, baralho, n); //Gera as cartas do deck marcando como usada no baralho
+
+    //Inicializa o frame com os dados necessários 
+    cards.start = START;
+    cards.flag  = SHUFFLE_FLAG;
+    cards.dest  = dest_index;
+    cards.round = round;
+    memset(cards.data, 0, MAX_DATA_LENGHT+1);
+
+    //Converte o vetor deck para uma string formatada em cards.data. Recebe o ponteo de cards.size para salvar o tamanho//
+    mao_baralho(deck, n, &cards.size, cards.data);
+    cards.num_cards = n; 
+    cards.size++; //Adiciona o tamanho do '\0'
+
+    //Libera o vetor do deck q nn será mais útil
+    free(deck);
+
+    return cards;
+}*/
