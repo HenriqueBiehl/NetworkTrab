@@ -61,6 +61,30 @@ int sendto_verify(int sckt, const void *message, size_t length, struct sockaddr 
         return ret;
 }
 
+uint8_t calcula_crc8(uint8_t *data, size_t len) {
+        uint8_t crc = 0x00;
+        uint8_t polynomial = 0x07; // Polinômio padrão do CRC-8: x^8 + x^2 + x + 1
+
+        for (size_t i = 0; i < len; i++) {
+                crc ^= data[i];
+                for (uint8_t j = 0; j < 8; j++) {
+                        if (crc & 0x80) {
+                                crc = (crc << 1) ^ polynomial;
+                        } else {
+                                crc <<= 1;
+                        }
+                }
+        }
+        return crc;
+}
+
+int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido) {
+        uint8_t crc_calculado = calcula_crc8(data, len);
+        return (crc_calculado == crc_recebido);
+}
+
+
+
 struct networkFrame gerar_mensagem_ack(uint8_t seq) {
 
         struct networkFrame message; 
@@ -70,7 +94,7 @@ struct networkFrame gerar_mensagem_ack(uint8_t seq) {
         message.type   = ACK; //Só pra testar
         char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -84,7 +108,7 @@ struct networkFrame gerar_mensagem_lista(uint8_t seq) {
         message.type   = LISTA;
         char msg[MAX_DATA_LENGHT] = "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL";
         memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -98,7 +122,7 @@ struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam) {
         message.type   = BAIXAR; //Só pra testar
         memset(message.data, 0, MAX_DATA_LENGHT);
         memcpy(&message.data, arqNome, tam);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 
@@ -113,7 +137,7 @@ struct networkFrame gerar_mensagem_resposta(uint8_t seq, uint8_t type) {
         message.type   = type; //Só pra testar
         char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         memcpy(&message.data, msg, MAX_DATA_LENGHT);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -127,7 +151,7 @@ struct networkFrame gerar_mensagem_enviar_mostra_tela(char *nome, uint8_t seq) {
         message.type = MOSTRA_NA_TELA;
         memset(message.data, 0, MAX_DATA_LENGHT);
         memcpy(&message.data, nome, message.size);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -141,7 +165,7 @@ struct networkFrame gerar_mensagem_erro(uint8_t seq, char *erro) {
         message.type = ERRO;
         memset(message.data, 0, MAX_DATA_LENGHT);
         memcpy(message.data, erro, strlen(erro));
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -155,7 +179,7 @@ struct networkFrame gerar_mensagem_dados(uint8_t seq, char *data, uint8_t size) 
         message.type = DADOS;
         memset(message.data, 0, MAX_DATA_LENGHT);
         memcpy(message.data, data, size);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -169,7 +193,7 @@ struct networkFrame gerar_mensagem_descritor_arq(uint8_t seq, char *data) {
         message.type = DESCRITOR_ARQUIVO;
         memset(message.data, 0, TAM_DESCRITOR);
         memcpy(message.data, data, TAM_DESCRITOR);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
 
         return message;
 }
@@ -182,7 +206,8 @@ struct networkFrame gerar_mensagem_fim_tx(uint8_t seq) {
         message.seq = seq;
         message.type = FIM_TX;
         memset(message.data, 0, MAX_DATA_LENGHT);
-        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);       
+        message.crc8 = calcula_crc8((uint8_t*)&message + 1, sizeof(message) - 2);
+
         return message;
 }
 
@@ -218,28 +243,6 @@ void printFrame(struct networkFrame frame) {
                 printf("%c ", frame.data[i]);
         printf("\n");
         printf("CRC: %u ", frame.crc8);
-}
-
-uint8_t calcula_crc8(uint8_t *data, size_t len) {
-        uint8_t crc = 0x00;
-        uint8_t polynomial = 0x07; // Polinômio padrão do CRC-8: x^8 + x^2 + x + 1
-
-        for (size_t i = 0; i < len; i++) {
-                crc ^= data[i];
-                for (uint8_t j = 0; j < 8; j++) {
-                        if (crc & 0x80) {
-                                crc = (crc << 1) ^ polynomial;
-                        } else {
-                                crc <<= 1;
-                        }
-                }
-        }
-        return crc;
-}
-
-int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido) {
-        uint8_t crc_calculado = calcula_crc8(data, len);
-        return (crc_calculado == crc_recebido);
 }
 
 FILE *abrir_arquivo(char *nome, char *tipo)

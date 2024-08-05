@@ -30,15 +30,25 @@ int main(){
         server_addr.sll_protocol = htons(ETH_P_ALL);
 
         uint8_t comando;
-        while (1) {
+
+        int running = 1;
+        while (running) {
                 comando = get_comando();
                 switch (comando) {
                         case (CMD_LISTAR):
                                 client_listar(sckt, server_addr);
                                 break;
+
                         case (CMD_BAIXAR):
-                                client_baixar(sckt, server_addr);
+                                //client_baixar(sckt, server_addr);
+                                client_baixar_janela_deslizante(sckt, server_addr);
                                 break;
+
+                        case (CMD_SAIR):
+                                printf("Terminando a execução.\n");
+                                running = 0;
+                                break;
+
                         case (CMD_DESCONHECIDO):
                                 printf("Comando inválido, tente novamente\n");
                                 break;
