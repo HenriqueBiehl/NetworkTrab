@@ -7,6 +7,7 @@
 #define CMD_BAIXAR 2
 #define CMD_SAIR 3
 #define CMD_DESCONHECIDO 4
+#define TAM_JANELA 5
 
 uint8_t get_comando();
 

@@ -59,7 +59,7 @@ struct networkFrame gerar_mensagem_lista(uint8_t seq);
 
 struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam);
 
-struct networkFrame gerar_mensagem_ack(uint8_t seq);
+struct networkFrame gerar_mensagem_resposta(uint8_t seq, uint8_t type);
 
 struct networkFrame gerar_mensagem_enviar_mostra_tela(char *nome, uint8_t seq);
 

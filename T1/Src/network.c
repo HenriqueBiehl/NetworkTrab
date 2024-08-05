@@ -90,13 +90,13 @@ struct networkFrame gerar_mensagem_baixar(uint8_t seq, char *arqNome, int tam) {
 
 }
 
-struct networkFrame gerar_mensagem_ack(uint8_t seq) {
+struct networkFrame gerar_mensagem_resposta(uint8_t seq, uint8_t type) {
 
         struct networkFrame message; 
         message.start  = 0x7e;
         message.size   = 63;
         message.seq    = seq; 
-        message.type   = ACK; //Só pra testar
+        message.type   = type; //Só pra testar
         char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         memcpy(&message.data, msg, MAX_DATA_LENGHT);
         message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
