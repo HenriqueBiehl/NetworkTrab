@@ -399,7 +399,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                 //memcpy(msg, &mensagem_erro, FRAME_SIZE);
                 //
                 sendto_verify(sckt, (char*)&mensagem_erro, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
-        } else {                                 
+        } else {                                
                 int checkpoint_i;         //Salva o indice do último elemento inserido na janela, útil para saber seu tamanho real
                 int msg_over = 0;         //Flag que indica que o arquivo chegou ao fim
                 int end_operation = 0;    //Flag que indica fim da operaçao de envio de arquivos
@@ -438,6 +438,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                         client_addr.sll_ifindex = ifindex;
                         client_addr.sll_family = AF_PACKET;
                         client_addr.sll_protocol = htons(ETH_P_ALL);
+
                         int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
                         if (ret < 0) {
                                 perror("Erro ao receber mensagem");
@@ -447,37 +448,42 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                                 printf("Received packet from %s:\n", client_addr.sll_addr);
                         }
 
-                        if(client_answer.start == START){
-                                switch(client_answer.type){
-                                        case ACK: 
-                                                {       
-                                                        //Caso tenha acabado de ler o arquivo, marca o fim da operação
-                                                        if(msg_over)
-                                                                end_operation = 1;
-                                                        else 
-                                                                seq = (client_answer.seq + 1)%TAM_JANELA;
-
-                                                }
-                                                break;
-
-                                        case NACK:
-                                                {
-                                                        seq = (seq + 1)%TAM_JANELA; //Sequencia avança em +1 na janela 
-                                                        index_startpoint = TAM_JANELA - client_answer.seq;
-                                                        //Puxar mensagens nao confirmadas para o inicio do vetor
-                                                        for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
-                                                                window[i-client_answer.seq] = window[i];
-                                                        }
-                                                }
-                                                break;
+                        while(client_answer.start != START){
+                                int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+                                if (ret < 0) {
+                                        perror("Erro ao receber mensagem");
+                                        close(sckt);
+                                        return -1;
+                                } else {
+                                        printf("Received packet from %s:\n", client_addr.sll_addr);
                                 }
+                        }
 
+                        switch(client_answer.type){
+                                case ACK: 
+                                {       
+                                        //Caso tenha acabado de ler o arquivo, marca o fim da operação
+                                        if(msg_over)
+                                                end_operation = 1;
+                                        else                      
+                                                seq = (client_answer.seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
+                                }
+                                break;
+
+                                case NACK:
+                                {
+                                        seq = (seq + 1)%TAM_JANELA; //Sequencia avança em +1 na janela 
+                                        index_startpoint = TAM_JANELA - client_answer.seq;
+                                        //Puxar mensagens nao confirmadas para o inicio do vetor
+                                        for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
+                                                window[i-client_answer.seq] = window[i];
+                                        }
+                                }
+                                break;
                         }
 
                 }
-
-
-                fclose(arq);
+                fclose(arq);        
         }
 
         return 0;
@@ -530,40 +536,47 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 
         FILE *baixado = fopen(nome_arquivo, "wb+");
         int count = 1;
-        int received_window = 0;
-        int seq_pre_failure = 0;
         int seq_failure = 0;
+        int seq_checkpoint = TAM_JANELA;
         int has_failures = 0; 
         int index_failure = TAM_JANELA;
         int fim_op = 0;
 
         while(1){
 
-                for(int i = 0; i < TAM_JANELA; ++i){
+                //Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
+                int received_window = 0; 
+                while(received_window < TAM_JANELA){
 
                         rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
                         if (rec < 0) 
                                 perror("Erro ao receber mensagem");
 
                         if(received.start == START){
-                                memcpy(&window[i], (char *)&received, FRAME_SIZE);
-                                if(received.type == FIM_TX);
-                                break;
-                        }       
-                        received_window++;
-                }
 
-
-                for(int i = 0; i < received_window; ++i){
-
-                        if (verifica_crc8((uint8_t*)&received, sizeof(received) - 1, received.crc8)){
-                                seq_pre_failure = received.seq;
-                        } else {
-                                has_failures = 1;
-                                seq_failure = (seq_pre_failure + 1)%TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
-                                index_failure = i;
-                                break;
-                        }
+                                if (verifica_crc8((uint8_t*)&received, sizeof(received) - 1, message.crc8)) 
+                                        seq_checkpoint= received.seq;
+                                else {
+                                        has_failures = 1;
+                                        seq_failure = (seq_checkpoint + 1)%TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
+                                        index_failure = received_window;
+                                        break;
+                                }
+                                
+                                /* Significa que uma mensagem da sequencia deu problem na hora do envio (sequencia esta fora de ordem) */
+                                if(window[received_window].seq != (seq_checkpoint + 1)%TAM_JANELA){
+                                        has_failures = 1;
+                                        seq_failure = (seq_checkpoint + 1)%TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
+                                        index_failure = received_window;
+                                        break;
+                                }
+                        
+                                memcpy(&window[received_window], &received, FRAME_SIZE);
+                                if(received.type == FIM_TX)
+                                        break;
+                        
+                                received_window++; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
+                        }               
                 }
 
                 for(int i = 0; i < received_window && i < index_failure; ++i) {
@@ -582,15 +595,15 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                 if (has_failures) {
                         answer = gerar_mensagem_resposta(seq_failure, NACK);
                 } else {
-                        answer = gerar_mensagem_resposta(seq_pre_failure, ACK);
+                        answer = gerar_mensagem_resposta(seq_checkpoint, ACK);
+                }
+                
+                if (sendto_verify(sckt, (char*)&answer, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+                        printFrame(answer);
+                        printf("Resposta %d enviada", answer.type);
                 }
 
-                if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
-                        printFrame(message);
-                        printf("Ack enviado");
-                }
-
-                if (fim_op) {
+                if (fim_op){
                         break;
                 }
 
@@ -606,12 +619,12 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
         fclose(baixado);
 
         //Enviando ack
-        message = gerar_mensagem_ack(seq++);
+        /*message = gerar_mensagem_ack(seq++);
 
         if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
                 printFrame(message);
                 printf("Ack enviado");
-        }
+        }*/
         //printFrame(received);
 
         return 0;
