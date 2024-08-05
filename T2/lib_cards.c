@@ -34,7 +34,6 @@ void print_deck(struct carta_t *v, unsigned int n){
         if(v[i].num != USADA)
             printf("[%d] - %c de %s\n", i+1, converte_numero_baralho(v[i].num), converte_int_naipe_string(v[i].naipe));
     }
-    printf("\n");
 }
 
 struct carta_t *vetor_cartas(char *data, unsigned int n, uint8_t num_cards){
@@ -83,7 +82,6 @@ void converte_apostas(char *data, unsigned int n, uint8_t *a, unsigned int k){
 
 void converte_rodada(char *data, unsigned int n, struct carta_t *r, unsigned int k){
     unsigned int index = 0;
-    printf("%s\n",data);
     for(int i=3; i < n && index < k; i+=3){
         r[index].num   = converte_char_baralho(data[i]);
         r[index].naipe = converte_char_naipe(data[i+1]);
@@ -116,10 +114,7 @@ uint8_t calcula_vitoria(struct carta_t *r, uint8_t *v, unsigned int n, struct ca
     }
 
     for(int i=1; i < n; ++i){
-        printf("Jogador %d\n",r[i].num);
         if(r[i].num != MORTO){
-            printf("Jogador avaliado %d\n", r[i].num);
-
 
             //Verifica se a carta atual não é um gato de Paus (carta mais forte e imbatível do jogo)
             if(r[i].num == gato.num){
@@ -228,6 +223,7 @@ void print_mesa(char *data, unsigned int n){
     printf("GATO: %c de %s\n", data[0], converte_char_naipe_string(data[1]));
 
     for(int i = 3; i < n-1; i+=3){
+
         if(converte_char_baralho(data[i]) != MORTO)
             printf("JOGADOR %d: %c de %s\n", (i-3)/3 , data[i], converte_char_naipe_string(data[i+1]));
         else 
@@ -246,6 +242,7 @@ void print_resultado_rodada(char *data, unsigned int n, int round){
     printf("GATO: %c de %s\n", data[0], converte_char_naipe_string(data[1]));
     printf("VENCEDOR: JOGADOR %d - %c de %s \n", converte_char_int(data[3]), data[4], converte_char_naipe_string(data[5]));
     for(int i = 7; i < n-1; i+=4){
+
         if(converte_char_int(data[i+1]) != MORTO)
             printf("JOGADOR %d: %c de %s\n", converte_char_int(data[i]) , data[i+1], converte_char_naipe_string(data[i+2]));
         else 
@@ -260,6 +257,7 @@ void print_resultado_partida(char *data, unsigned int n, int maxHand){
     printf("\n!!!! RESULTADO PARTIDA COM MAO %d !!!!\n", maxHand);
     printf("\n");
     for(int i = 0; i < n-1; i+=5){
+
         if(converte_char_int(data[i+1]) != MORTO){
             printf("JOGADOR %d:\n", converte_char_int(data[i]));
             printf("    APOSTAS: Fazia %c\n", data[i+1]);

@@ -48,11 +48,11 @@ struct token_ring{
     char token[TOKEN_SIZE+1];
 };
 
-int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
+int bind_socket(int sock, struct sockaddr_in *addr, unsigned int port){
     memset(addr, 0, sizeof(*addr));
     addr->sin_family = AF_INET;
     addr->sin_addr.s_addr = htonl(INADDR_ANY);
-    addr->sin_port = htons(PORT_BASE+index);
+    addr->sin_port = htons(port);
 
     if(bind(sock, (struct sockaddr*)addr, sizeof(*addr)) == -1)
         return 0; 
@@ -60,11 +60,14 @@ int bind_socket(int sock, struct sockaddr_in *addr, unsigned int index){
     return 1;
 }
 
-void setar_nodo_mult_maquinas(struct sockaddr_in *node, unsigned short port){
+void setar_nodo_mult_maquinas(struct sockaddr_in *node, char *ip_next_node, unsigned short port){
     memset(node, 0, sizeof(*node));
     node->sin_family = AF_INET;
-    node->sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // Para simplicidade, usando loopback
     node->sin_port = htons(port);
+    if (inet_pton(AF_INET, ip_next_node, &node->sin_addr) <= 0) {
+        perror("invalid address/ Address not supported");
+    }
+
 }
 
 void setar_nodo_loop_back(struct sockaddr_in *node, unsigned int index){
@@ -226,14 +229,10 @@ int main(int argc, char *argv[]){
         printf("** Uso com múltiplas maquinas **");
         port = atoi(argv[3]);
         // Converter IP de string para endereço binário
-        setar_nodo_mult_maquinas(&next_node_addr, port);
-        if (inet_pton(AF_INET, argv[2], &next_node_addr.sin_addr) <= 0) {
-            perror("inet_pton");
-            exit(1);
-        }
+        setar_nodo_mult_maquinas(&next_node_addr, argv[2], port);
     }
     else {
-        port += next_node_index;
+        port += index;
         setar_nodo_loop_back(&next_node_addr, next_node_index);
     }
 
@@ -241,7 +240,7 @@ int main(int argc, char *argv[]){
     if(sock == -1)
         perror("Falha ao criar socket\n");
 
-    if(!bind_socket(sock, &my_addr, index))
+    if(!bind_socket(sock, &my_addr, port))
         perror("Falha no bind do socket\n");
     
     //printf("Socket para %d: %d\n", index, sock);
@@ -535,7 +534,6 @@ int main(int argc, char *argv[]){
                 case SHUFFLE_FLAG: 
                     {                
                         if(message.dest == 0 && index == 0){
-                            printf("(((( %s ))))\n", message.data);
                             if(dest == 3){
                                 MASTER_FLAG = BET_FLAG; 
                                 dest = 0;   
@@ -548,7 +546,6 @@ int main(int argc, char *argv[]){
                             
                             cartas_mao = message.num_cards;
                             round = message.round;
-                            printf("    ((( ESTOU NO ROUND %d E COM %d CARTAS )))\n", round, cartas_mao);
                             deck = vetor_cartas(message.data, message.size, cartas_mao);
                             print_mao(deck, cartas_mao, round);
                         } 
