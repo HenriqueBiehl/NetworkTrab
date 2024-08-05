@@ -1,6 +1,6 @@
 # Compilador e flags
 CC = gcc
-CFLAGS = -std=gnu17 -Wall -g -Wno-packed-bitfield-compat
+CFLAGS = -std=gnu17 -Wall -g -Wno-packed-bitfield-compat -Wno-format-truncation -D_XOPEN_SOURCE=500
 
 # Diretórios
 SRC_DIR = .

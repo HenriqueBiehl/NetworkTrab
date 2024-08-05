@@ -1,5 +1,96 @@
-#include <stdio.h>
 #include "comandos.h"
+
+// Função para empacotar informações do arquivo
+void empacotar_info_stat(const char *nome_arquivo, char *buffer) {
+        struct stat file_stat;
+
+        if (stat(nome_arquivo, &file_stat) < 0) {
+                perror("stat");
+                return;
+        }
+
+        // Tipo de Arquivo (1 byte)
+        buffer[0] = (file_stat.st_mode & S_IFDIR) ? 'D' : 'F';
+
+        // Permissões (3 bytes)
+        buffer[1] = (file_stat.st_mode & S_IRUSR) ? 'r' : '-';
+        buffer[2] = (file_stat.st_mode & S_IWUSR) ? 'w' : '-';
+        buffer[3] = (file_stat.st_mode & S_IXUSR) ? 'x' : '-';
+
+        // Tamanho do Arquivo (7 bytes)
+        snprintf(buffer + 4, 8, "%7ld", file_stat.st_size);
+
+        // Data de Modificação (8 bytes)
+        struct tm *timeinfo = localtime(&file_stat.st_mtime);
+        snprintf(buffer + 11, 9, "%04d%02d%02d", timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday);
+
+        // Horário de Modificação (6 bytes) - Hora e Minuto
+        snprintf(buffer + 19, 6, "%02d%02d", timeinfo->tm_hour, timeinfo->tm_min);
+}
+
+// Função para desempacotar e aplicar as informações do arquivo
+void desempacotar_info_stat(const char *buffer, const char *nome_arquivo) {
+        // Cria o arquivo
+        int fd = open(nome_arquivo, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) {
+                perror("open");
+                return;
+        }
+
+        // Tipo de Arquivo e Permissões
+        mode_t mode = 0;
+        if (buffer[0] == 'D') {
+                mode |= S_IFDIR;
+        } else if (buffer[0] == 'F') {
+                mode |= S_IFREG;
+        }
+
+        if (buffer[1] == 'r') mode |= S_IRUSR;
+        if (buffer[2] == 'w') mode |= S_IWUSR;
+        if (buffer[3] == 'x') mode |= S_IXUSR;
+
+        // Setando permissões para grupo e outros (Assumindo permissões iguais ao usuário)
+        if (buffer[1] == 'r') mode |= S_IRGRP | S_IROTH;
+        if (buffer[2] == 'w') mode |= S_IWGRP | S_IWOTH;
+        if (buffer[3] == 'x') mode |= S_IXGRP | S_IXOTH;
+
+        // Aplica as permissões do arquivo
+        fchmod(fd, mode);
+
+        // Tamanho do Arquivo
+        char tamanhoStr[8];
+        strncpy(tamanhoStr, buffer + 4, 7);
+        tamanhoStr[7] = '\0'; // Finaliza com null
+        off_t tamanhoArquivo = strtol(tamanhoStr, NULL, 10);
+
+        // Trunca o arquivo para o tamanho desejado
+        ftruncate(fd, tamanhoArquivo);
+
+        // Data e Hora de Modificação
+        char dataStr[9], horaStr[5];
+        strncpy(dataStr, buffer + 11, 8);
+        dataStr[8] = '\0'; // Finaliza com null
+
+        strncpy(horaStr, buffer + 19, 4);
+        horaStr[4] = '\0'; // Finaliza com null
+
+        struct tm timeinfo = {0};
+        strptime(dataStr, "%Y%m%d", &timeinfo);
+        timeinfo.tm_hour = strtol(horaStr, NULL, 10) / 100;
+        timeinfo.tm_min = strtol(horaStr, NULL, 10) % 100;
+
+        time_t mod_time = mktime(&timeinfo);
+
+        // Aplica a data de modificação
+        struct utimbuf new_times;
+        new_times.actime = mod_time;    // Tempo de acesso
+        new_times.modtime = mod_time;   // Tempo de modificação
+        utime(nome_arquivo, &new_times);
+
+        // Fecha o arquivo
+        close(fd);
+}
+
 
 // Utilidade (pode ser criado um utils.s/h depois...)
 FILE *listar_no_buffer() {
@@ -12,8 +103,6 @@ FILE *listar_no_buffer() {
         }
         return fp;
 }
-
-
 
 uint8_t get_comando() {
 
@@ -123,20 +212,22 @@ int client_baixar(int sckt, struct sockaddr_ll server_addr) {
                 /* Caso de NACK*/
                 return -1;
         } else {
-                printf("recebida a primeira mensagem do baixar\n");
-                printFrame(received);
+                printf("recebida a primeira mensagem do baixar");
+
+                // Essa mensagem deve ser do tipo descritor de arquivo
         }
 
         FILE *baixado = fopen(nome_arquivo, "wb+");
         int count = 1;
         while (received.type != FIM_TX) {
-                //if (received.type != DADOS) {
-                //        printf("Esta mensagem nao é de dados.");
-                //        continue;
-                //}
                 if (received.start != START) {
                         printf("mensagem invalida............\n");
                         continue;
+                }
+                if (received.type == DESCRITOR_ARQUIVO) {
+                        printf("Recebido o descritor do arquivo\n");
+                        desempacotar_info_stat((const char *)received.data, nome_arquivo);
+                        printFrame(received);
                 }
                 if (received.type == DADOS) {
                         printf("Baixando(%d)...\n", count++);
@@ -207,7 +298,6 @@ int server_baixar(int sckt, struct sockaddr_ll client_addr, struct networkFrame 
         memcpy(name_buffer, message.data, message.size);
         strcat(arq_path, name_buffer);
 
-
         printf("%s", arq_path);
         for (int i = 0; i < strlen(arq_path); i++) {
                 printf("%c ", arq_path[i]);
@@ -219,6 +309,8 @@ int server_baixar(int sckt, struct sockaddr_ll client_addr, struct networkFrame 
         memset(buffer, 0, 63);
 
         int i = 0;
+
+
         if(!arq) {
                 printf("Erro: nao encontrado\n");
                 snprintf(name_buffer, 15,"Nao econtrado\n");
@@ -228,6 +320,14 @@ int server_baixar(int sckt, struct sockaddr_ll client_addr, struct networkFrame 
                 //
                 sendto_verify(sckt, (char*)&mensagem_erro, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
         } else {                                 
+
+                empacotar_info_stat(arq_path, buffer);
+                struct networkFrame mensagem_descritor = gerar_mensagem_descritor_arq(i, buffer);
+                sendto_verify(sckt, (char*)&mensagem_descritor, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                printFrame(mensagem_descritor);
+
+                memset(buffer, 0, 63);
+
                 //criar loop para preencher a janela. Para quando a janela estiver preenchida ou o arquivo acabou       
                 bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
                 struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, bytes_read);
@@ -240,7 +340,7 @@ int server_baixar(int sckt, struct sockaddr_ll client_addr, struct networkFrame 
                         i++;
                 }
                 //Ao enviar, aguarda o ACK/NACK do cliente
-                
+
                 //Caso receba um NACK, reinicia i e deixa no vetor da janela as mensagens que ainda não foram confirmadas
                 //Caso ACK, reinicia i e faz uma outra leitura em loop dessa (FIM_TX vai nessa tbm)
                 while (!feof(arq)) {
@@ -270,7 +370,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
         char arq_path[128];
         char name_buffer[63];
         char buffer[63];
-        struct struct networkFrame window[5];
+        struct networkFrame window[5];
         FILE *arq;                        
 
         memset(window, 0, FRAME_SIZE*5);
@@ -307,7 +407,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                 int seq = 0;              //Indica o número da sequencia de msgs na janela
 
                 while(!end_operation){
-                        
+
                         for(int i=index_startpoint; i < TAM_JANELA && !feof(arq); i++){
                                 bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
                                 window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
@@ -316,7 +416,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                                 seq++;
                                 checkpoint_i = i;
                         }
-                
+
                         /* Significa que você não completou a janela mas fechou o arquivo, então, da pra enviar FIM_TX na janela*/
                         if(checkpoint_i < 4){
                                 checkpoint_i++;
@@ -324,12 +424,12 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                                 printf("ENVIANDO O FIM DA TX........................\n");
                                 msg_over = 1;
                         }
-                        
+
                         //Envia as mensagens da janela 
                         for(int i =0; i < checkpoint_i+1; ++i){
-                                sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr))
+                                sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
                         }
-                        
+
                         struct sockaddr_ll client_addr = {0};
                         struct networkFrame client_answer;
 
@@ -346,37 +446,37 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                         } else {
                                 printf("Received packet from %s:\n", client_addr.sll_addr);
                         }
-                        
+
                         if(client_answer.start == START){
                                 switch(client_answer.type){
                                         case ACK: 
-                                        {       
-                                                //Caso tenha acabado de ler o arquivo, marca o fim da operação
-                                                if(msg_over)
-                                                        end_operation = 1;
-                                                else 
-                                                        seq = (client_answer.seq + 1)%TAM_JANELA;
+                                                {       
+                                                        //Caso tenha acabado de ler o arquivo, marca o fim da operação
+                                                        if(msg_over)
+                                                                end_operation = 1;
+                                                        else 
+                                                                seq = (client_answer.seq + 1)%TAM_JANELA;
 
-                                        }
-                                        break;
+                                                }
+                                                break;
 
                                         case NACK:
-                                        {
-                                                seq = (seq + 1)%TAM_JANELA; //Sequencia avança em +1 na janela 
-                                                index_startpoint = TAM_JANELA - client_answer.seq;
-                                                //Puxar mensagens nao confirmadas para o inicio do vetor
-                                                for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
-                                                        window[i-client_answer.seq] = window[i];
+                                                {
+                                                        seq = (seq + 1)%TAM_JANELA; //Sequencia avança em +1 na janela 
+                                                        index_startpoint = TAM_JANELA - client_answer.seq;
+                                                        //Puxar mensagens nao confirmadas para o inicio do vetor
+                                                        for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
+                                                                window[i-client_answer.seq] = window[i];
+                                                        }
                                                 }
-                                        }
-                                        break;
+                                                break;
                                 }
 
                         }
 
                 }
 
-                 
+
                 fclose(arq);
         }
 
@@ -432,66 +532,67 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
         int count = 1;
         int received_window = 0;
         int seq_pre_failure = 0;
+        int seq_failure = 0;
         int has_failures = 0; 
         int index_failure = TAM_JANELA;
         int fim_op = 0;
 
         while(1){
-                
-                for(int i=0; i < TAM_JANELA; ++i){
+
+                for(int i = 0; i < TAM_JANELA; ++i){
 
                         rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
                         if (rec < 0) 
                                 perror("Erro ao receber mensagem");
-                        
+
                         if(received.start == START){
-                                memcpy(&window[i], received, FRAME_SIZE);
+                                memcpy(&window[i], (char *)&received, FRAME_SIZE);
                                 if(received.type == FIM_TX);
-                                        break;
+                                break;
                         }       
                         received_window++;
                 }
 
 
-                for(int i=0; i < received_window; ++i){
+                for(int i = 0; i < received_window; ++i){
 
-                        if (verifica_crc8((uint8_t*)&received, sizeof(received) - 1, received.crc8)) 
+                        if (verifica_crc8((uint8_t*)&received, sizeof(received) - 1, received.crc8)){
                                 seq_pre_failure = received.seq;
-                        else {
+                        } else {
                                 has_failures = 1;
                                 seq_failure = (seq_pre_failure + 1)%TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
                                 index_failure = i;
                                 break;
                         }
                 }
-        
-                for(int i=0; i < received_window && i < index_failure; ++i){
+
+                for(int i = 0; i < received_window && i < index_failure; ++i) {
 
                         if (window[i].type == DADOS) {
                                 printf("Baixando(%d)...\n", count++);
                                 printFrame(received);
                                 fwrite(received.data, sizeof(char), received.size, baixado);
                         }
-                        if (window[i].type == FIM_TX)
+                        if (window[i].type == FIM_TX) {
                                 fim_op = 1;
+                        }
                 }
 
                 struct networkFrame answer; 
-
-                if(has_failures){
+                if (has_failures) {
                         answer = gerar_mensagem_resposta(seq_failure, NACK);
-                }
-                else{
+                } else {
                         answer = gerar_mensagem_resposta(seq_pre_failure, ACK);
                 }
-                
+
                 if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
                         printFrame(message);
                         printf("Ack enviado");
                 }
 
-                if(fim_op)
+                if (fim_op) {
                         break;
+                }
 
                 //Ler todas as mensagens na janela
                 //Verificar se tem mensagens certas/Erradas

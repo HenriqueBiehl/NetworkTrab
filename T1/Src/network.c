@@ -16,7 +16,7 @@ int cria_raw_socket() {
         return sckt;
 }
 
-void bind_raw_socket(int sckt, char *netInterface){
+void bind_raw_socket(int sckt, char *netInterface) {
         /*
            Obtém o indice da interface de rede especificada pelo parametro
            netInterface
@@ -61,13 +61,27 @@ int sendto_verify(int sckt, const void *message, size_t length, struct sockaddr 
         return ret;
 }
 
+struct networkFrame gerar_mensagem_ack(uint8_t seq) {
+
+        struct networkFrame message; 
+        message.start  = 0x7e;
+        message.size   = 63;
+        message.seq    = seq; 
+        message.type   = ACK; //Só pra testar
+        char msg[MAX_DATA_LENGHT] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        memcpy(&message.data, msg, MAX_DATA_LENGHT);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+}
+
 struct networkFrame gerar_mensagem_lista(uint8_t seq) {
 
         struct networkFrame message; 
         message.start  = 0x7e;
         message.size   = 63;
         message.seq    = seq; 
-        message.type   = LISTA; //Só pra testar
+        message.type   = LISTA;
         char msg[MAX_DATA_LENGHT] = "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL";
         memcpy(&message.data, msg, MAX_DATA_LENGHT);
         message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
@@ -118,7 +132,7 @@ struct networkFrame gerar_mensagem_enviar_mostra_tela(char *nome, uint8_t seq) {
         return message;
 }
 
-struct networkFrame gerar_mensagem_erro(uint8_t seq, char *erro){
+struct networkFrame gerar_mensagem_erro(uint8_t seq, char *erro) {
 
         struct networkFrame message;
         message.start = START;
@@ -132,7 +146,7 @@ struct networkFrame gerar_mensagem_erro(uint8_t seq, char *erro){
         return message;
 }
 
-struct networkFrame gerar_mensagem_dados(uint8_t seq, char *data, uint8_t size){
+struct networkFrame gerar_mensagem_dados(uint8_t seq, char *data, uint8_t size) {
 
         struct networkFrame message;
         message.start = START;
@@ -141,6 +155,20 @@ struct networkFrame gerar_mensagem_dados(uint8_t seq, char *data, uint8_t size){
         message.type = DADOS;
         memset(message.data, 0, MAX_DATA_LENGHT);
         memcpy(message.data, data, size);
+        message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
+
+        return message;
+}
+
+struct networkFrame gerar_mensagem_descritor_arq(uint8_t seq, char *data) {
+
+        struct networkFrame message;
+        message.start = START;
+        message.size = TAM_DESCRITOR;
+        message.seq = seq;
+        message.type = DESCRITOR_ARQUIVO;
+        memset(message.data, 0, TAM_DESCRITOR);
+        memcpy(message.data, data, TAM_DESCRITOR);
         message.crc8 = calcula_crc8((uint8_t*)&message, sizeof(message) - 1);
 
         return message;
