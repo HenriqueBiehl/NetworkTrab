@@ -31,6 +31,7 @@
 
 #define MAX_CARTAS_MAO 9
 #define TAM_BARALHO 40
+#define VIDAS_MAX 4
 
 struct message_frame{
     uint8_t start;                        //Bits de inicio transmissão
@@ -266,7 +267,7 @@ int main(int argc, char *argv[]){
 
 
         vidas = malloc(sizeof(uint8_t)*NUM_NODES);
-        memset(vidas, 4, NUM_NODES);
+        memset(vidas, VIDAS_MAX, NUM_NODES);
 
         apostas = malloc(sizeof(uint8_t)*NUM_NODES);
         memset(apostas, 0, NUM_NODES);
@@ -288,7 +289,7 @@ int main(int argc, char *argv[]){
     int round = 1;
     int aposta;     
     int ganhador;
-    uint8_t contVidas = 4;
+    uint8_t contVidas = VIDAS_MAX;
 
     while(1){
 
@@ -371,10 +372,10 @@ int main(int argc, char *argv[]){
                                 
                                 memset(data_buffer, 0, MAX_DATA_LENGHT+1);
                                 if(contVidas != 0){
-                                    print_mao(deck, message.num_cards, round);
+                                    print_mao(deck, cartas_mao, round);
 
                                     printf("Escolha uma carta para jogar\n");
-                                    opt = escolhe_cartas(deck, message.num_cards);
+                                    opt = escolhe_cartas(deck, cartas_mao);
                                     carta = deck[opt]; 
                                     snprintf(data_buffer, 7 ,"%c%c@%c%c|", converte_numero_baralho(gato.num), converte_numero_naipe(gato.naipe), converte_numero_baralho(carta.num),converte_numero_naipe(carta.naipe));
                                     marcar_carta_usada(&deck[opt]);
@@ -417,7 +418,7 @@ int main(int argc, char *argv[]){
                             {
                                 if(message.dest == index){
                                     memset(data_buffer, 0, MAX_DATA_LENGHT+1);
-                                    snprintf(data_buffer, 12 ,"RECEBIDO:%c\n", converte_int_char(index));
+                                    snprintf(data_buffer,33 ,"RECEBIDO:%c ROUND %c e %c CARTAS\n", converte_int_char(index),  converte_int_char(round), converte_int_char(cartas_mao));
                                     preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, SHUFFLE_FLAG, round, cartas_mao, 0);
                                 }
                             }
@@ -456,7 +457,7 @@ int main(int argc, char *argv[]){
                                 memcpy(data_buffer, message.data, MAX_DATA_LENGHT+1);
                                 
                                 if(contVidas != 0){
-                                    print_mao(deck, message.num_cards, round);
+                                    print_mao(deck, cartas_mao, round);
                                     printf("Escolha uma carta para jogar\n");
                                     opt = escolhe_cartas(deck, cartas_mao);
                                     carta = deck[opt]; 
@@ -534,15 +535,22 @@ int main(int argc, char *argv[]){
                 case SHUFFLE_FLAG: 
                     {                
                         if(message.dest == 0 && index == 0){
+                            printf("(((( %s ))))\n", message.data);
                             if(dest == 3){
                                 MASTER_FLAG = BET_FLAG; 
                                 dest = 0;   
                             }
                         }
                         else if (message.dest == index){
+                            
+                            if(contVidas == 0)
+                                contVidas = VIDAS_MAX;
+                            
                             cartas_mao = message.num_cards;
-                            deck = vetor_cartas(message.data, message.size, message.num_cards);
-                            print_mao(deck, message.num_cards, round);
+                            round = message.round;
+                            printf("    ((( ESTOU NO ROUND %d E COM %d CARTAS )))\n", round, cartas_mao);
+                            deck = vetor_cartas(message.data, message.size, cartas_mao);
+                            print_mao(deck, cartas_mao, round);
                         } 
                     }
                     break; 
@@ -590,7 +598,7 @@ int main(int argc, char *argv[]){
 
                 case RESULTS_FLAG:
                     {
-                        print_resultado_rodada(message.data, message.size - 1, message.round);
+                        print_resultado_rodada(message.data, message.size - 1, round);
 
                         if(message.dest == 0 && index == 0){
 
@@ -623,6 +631,12 @@ int main(int argc, char *argv[]){
                                     MASTER_FLAG = END_GAME_FLAG;
                                 }
                                 else{
+
+                                    if(unico_sobrevivente(vidas, 4)){
+                                        memset(vidas, VIDAS_MAX, NUM_NODES);
+                                        contVidas = VIDAS_MAX;
+                                    }
+
                                     round = 1; 
                                 
                                     if(cartas_mao ==  MAX_CARTAS_MAO)

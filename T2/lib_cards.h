@@ -30,6 +30,8 @@ struct carta_t *vetor_cartas(char *data, unsigned int n, uint8_t num_cards);
 
 void mao_baralho(struct carta_t *c, int n, unsigned int *size, char *str);
 
+int unico_sobrevivente(uint8_t *vidas, uint8_t n);
+
 /* Calcula o jogador vitorioso da rodada (r), e marca o contador de vitórias em v[i] */
 /* Recebe como parametro o numero de jogadores (n) e a carta mais forte da rodada (gato) */
 /* ADICIONAR: calculo para caso o jogador i esteja morto */

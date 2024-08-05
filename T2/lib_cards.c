@@ -91,6 +91,21 @@ void converte_rodada(char *data, unsigned int n, struct carta_t *r, unsigned int
     }
 }
 
+int unico_sobrevivente(uint8_t *vidas, uint8_t n){
+    int num_vivos = 0;
+
+
+    for(int i = 0; i < n; ++i){
+        if(vidas[i] != 0)
+            num_vivos++; 
+
+        if(num_vivos >= 2)
+            return 0;
+    }
+
+    return 1;
+}
+
 uint8_t calcula_vitoria(struct carta_t *r, uint8_t *v, unsigned int n, struct carta_t gato){
     unsigned int index_highest = 0;
     struct carta_t highest_card = r[0]; 
@@ -101,7 +116,10 @@ uint8_t calcula_vitoria(struct carta_t *r, uint8_t *v, unsigned int n, struct ca
     }
 
     for(int i=1; i < n; ++i){
+        printf("Jogador %d\n",r[i].num);
         if(r[i].num != MORTO){
+            printf("Jogador avaliado %d\n", r[i].num);
+
 
             //Verifica se a carta atual não é um gato de Paus (carta mais forte e imbatível do jogo)
             if(r[i].num == gato.num){
@@ -112,7 +130,7 @@ uint8_t calcula_vitoria(struct carta_t *r, uint8_t *v, unsigned int n, struct ca
             }
 
             //Verifica se a carta r não é maior que a maior carta atual (que não pode ser o gato)
-            if(r[i].num > highest_card.num && highest_card.num != gato.num){
+            if((r[i].num > highest_card.num && highest_card.num != gato.num) || highest_card.num == MORTO){
                 highest_card = r[i];
                 index_highest = i;
             }
@@ -145,7 +163,6 @@ void descontar_vidas_perdidas(uint8_t *vidas, uint8_t *apostas, uint8_t *vitoria
                 desconto = vitorias[i] - apostas[i];
             else 
                 desconto = apostas[i] - vitorias[i];
-
 
             if(desconto > vidas[i])
                 vidas[i] = 0;
@@ -208,11 +225,11 @@ void print_mesa(char *data, unsigned int n){
 
     printf("\n$$$$$$$$$$$$$$$$ MESA $$$$$$$$$$$$$$$\n");  
     printf("\n");
-    printf("GATO: %c de %c\n", data[0], data[1]);
+    printf("GATO: %c de %s\n", data[0], converte_char_naipe_string(data[1]));
 
     for(int i = 3; i < n-1; i+=3){
-        if(converte_char_baralho(data[i] != MORTO))
-            printf("JOGADOR %d: %c de %c\n", (i-3)/3 , data[i], data[i+1]);
+        if(converte_char_baralho(data[i]) != MORTO)
+            printf("JOGADOR %d: %c de %s\n", (i-3)/3 , data[i], converte_char_naipe_string(data[i+1]));
         else 
             printf("JOGADOR %d MORTO\n", (i-3)/3);
 
@@ -226,11 +243,11 @@ void print_resultado_rodada(char *data, unsigned int n, int round){
 
     printf("\n******* RESULTADO RODADA %d *******\n", round);
     printf("\n");
-    printf("GATO: %c de %c\n", data[0], data[1]);
-    printf("VENCEDOR: JOGADOR %d - %c de %c \n", converte_char_int(data[3]), data[4], data[5]);
+    printf("GATO: %c de %s\n", data[0], converte_char_naipe_string(data[1]));
+    printf("VENCEDOR: JOGADOR %d - %c de %s \n", converte_char_int(data[3]), data[4], converte_char_naipe_string(data[5]));
     for(int i = 7; i < n-1; i+=4){
         if(converte_char_int(data[i+1]) != MORTO)
-            printf("JOGADOR %d: %c de %c\n", converte_char_int(data[i]) , data[i+1], data[i+2]);
+            printf("JOGADOR %d: %c de %s\n", converte_char_int(data[i]) , data[i+1], converte_char_naipe_string(data[i+2]));
         else 
             printf("JOGADOR %d ESTÁ MORTO\n", converte_char_int(data[i]));
     }
