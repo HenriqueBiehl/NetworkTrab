@@ -738,7 +738,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 
         //printf("Recebeu o FIM_TX, fechando o arquivo ....n");
         fclose(baixado);
-        desempacotar_info_stat(stats_arq, nome_arquivo);
+        //desempacotar_info_stat(stats_arq, nome_arquivo);
 
         //Enviando ack
         /*message = gerar_mensagem_ack(seq++);
