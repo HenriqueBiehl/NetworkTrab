@@ -620,7 +620,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 
         unsigned long int file_size = atol((char*)message.data+4);
 
-        if(!ha_espaco(file_size)){
+        if (!ha_espaco(file_size)) {
                 char err_buff[13];
                 printf("Erro: Disco Cheio\n");
                 snprintf(err_buff, 13,"Disco cheio\n");
@@ -639,7 +639,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
         FILE *baixado = fopen(nome_arquivo, "wb+");
         int count = 1;
         int seq_failure = 0;
-        int seq_checkpoint = TAM_JANELA-1;
+        int seq_checkpoint = TAM_JANELA - 1;
         int has_failures = 0; 
         int index_failure = TAM_JANELA;
         int fim_op = 0;

@@ -17,20 +17,27 @@
 
 int main(){
 
+        //const *interface;
+
+        #ifdef LOOPBACK
+                char *interface = "lo";
+        #else
+                char *interface = "eth0";
+        #endif
+
         int sckt = cria_raw_socket();
         struct networkFrame message;
 
-        bind_raw_socket(sckt, "eth0");
-        setar_modo_promiscuo(sckt, "eth0");
+        bind_raw_socket(sckt, interface);
+        setar_modo_promiscuo(sckt, interface);
 
-        printf("sckt: %d\n", sckt);
-        
+        //printf("sckt: %d\n", sckt);
 
         struct sockaddr_ll client_addr = {0};
 
         socklen_t addr_len = sizeof(struct sockaddr_ll);
 
-        int ifindex = if_nametoindex("eth0");
+        int ifindex = if_nametoindex(interface);
         client_addr.sll_ifindex = ifindex;
         client_addr.sll_family = AF_PACKET;
         client_addr.sll_protocol = htons(ETH_P_ALL);

@@ -13,18 +13,25 @@
 
 int main(){
 
+        #ifdef LOOPBACK
+                char *interface = "lo";
+        #else
+                char *interface = "eth0";
+        #endif
+
+
         int sckt = cria_raw_socket();
 
         //memset(&server_addr, 0, sizeof(server_addr));
-        bind_raw_socket(sckt, "eth0");
-        setar_modo_promiscuo(sckt, "eth0");
+        bind_raw_socket(sckt, interface);
+        setar_modo_promiscuo(sckt, interface);
 
-        printf("sckt: %d\n", sckt);
+        //printf("sckt: %d\n", sckt);
 
         //Procedimento para poder enviar informações
         //
         struct sockaddr_ll server_addr = {0};
-        int ifindex = if_nametoindex("eth0");
+        int ifindex = if_nametoindex(interface);
         server_addr.sll_ifindex = ifindex;
         server_addr.sll_family = AF_PACKET;
         server_addr.sll_protocol = htons(ETH_P_ALL);
