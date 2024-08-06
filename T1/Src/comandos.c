@@ -665,7 +665,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                                         has_failures = 1;
                                         seq_failure = (seq_checkpoint + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
                                         index_failure = received_window;
-                                        printf("Problema na hora do envio (seq fora de ordem\n)");
+                                        printf("Problema na hora do envio (seq fora de ordem: %d recebido e %d esperado - seq_checkpoint %d) \n", window[received_window].seq, (seq_checkpoint + 1) % TAM_JANELA, seq_checkpoint);
                                         break;
                                 }
 
