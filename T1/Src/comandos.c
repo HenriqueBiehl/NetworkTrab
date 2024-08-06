@@ -475,7 +475,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                 for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
                         bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
                         window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
-                        printf("Mensagem %d gerada\n", i);
+                        printf("Mensagem %d gerada\n", window[i].seq);
                         printFrame(window[i]);
                         seq++;
                         checkpoint_i = i;
