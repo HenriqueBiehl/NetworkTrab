@@ -673,17 +673,18 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                                 printf("Janela %d esta correta , RW %d\n", received.seq, received_window);
 
                                 memcpy(&window[received_window], &received, FRAME_SIZE);
-                                if(window[received_window].type == FIM_TX){
+                                received_window++; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
+
+                                if(received.type == FIM_TX){
                                         printf("Recebi um fim TX na janela\n");
                                         break;
 
                                 }
 
-                                received_window++; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
                         }               
                 }
 
-                for(int i = 0; i < received_window && i < index_failure; ++i) {
+                for(int i = 0; i < received_window+1 && i < index_failure; ++i) {
                         if (window[i].type == DADOS) {
                                 printf("Baixando(%d)...\n", count++);
                                 printFrame(window[i]);
