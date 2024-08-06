@@ -471,7 +471,8 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 
         printf("Iniciando operação das janelas deslizantes\n");
         while(!end_operation) {
-
+                
+                checkpoint_i = index_startpoint;
                 for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
                         bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
                         window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
@@ -483,6 +484,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 
                 /* Significa que você não completou a janela mas fechou o arquivo, então, da pra enviar FIM_TX na janela*/
                 if (checkpoint_i < 4) {
+                        printf("Cenário de Fim TX\n");
                         checkpoint_i++;
                         window[checkpoint_i] = gerar_mensagem_fim_tx(seq);
                         printf("======ENVIANDO O FIM DA TX=======\n");
@@ -491,17 +493,17 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 
                 //Envia as mensagens da janela 
                 for (int i = 0; i < checkpoint_i + 1; ++i) {
+                        printf("Enviando mensagens janela\n");
                         sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
                 }
 
+
+                printf("Recebendo mensagens de ACK do cliente\n");
                 int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
                 if (ret < 0) {
                         perror("Erro ao receber mensagem");
                         close(sckt);
                         return -1;
-                } else {
-                        //printFrame(client_answer);
-                        //printf("Received packet from %s:\n", client_addr.sll_addr);
                 }
 
                 while(client_answer.start != START){
@@ -510,34 +512,47 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                                 perror("Erro ao receber mensagem");
                                 close(sckt);
                                 return -1;
-                        } else {
-                                //printFrame(client_answer);
-                                //printf("Received packet from %s:\n", client_addr.sll_addr);
                         }
                 }
 
                 switch(client_answer.type){
                         case ACK: 
+                                printf("Ack do cliente em %d\n",client_answer.seq);
                                 //Caso tenha acabado de ler o arquivo, marca o fim da operação
                                 if (msg_over) {
+                                        printf("Irei encerrar a operação\n");
                                         end_operation = 1;
                                 } else {
                                         seq = (client_answer.seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
+                                        printf("Sequencia de mensagens inicia em %d\n", seq);
                                 }
                                 break;
 
                         case NACK:
+                                printf("Nack do cliente em %d\n", client_answer.seq);
                                 seq = (seq + 1) % TAM_JANELA; //Sequencia avança em +1 na janela 
                                 index_startpoint = TAM_JANELA - client_answer.seq;
                                 //Puxar mensagens nao confirmadas para o inicio do vetor
+                                printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
                                 for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
                                         window[i-client_answer.seq] = window[i];
                                 }
+
+                                for(int i = 0; i < TAM_JANELA; ++i){
+                                        if(window[i].type == FIM_TX){
+                                                printf("seq de %d = %d | ", i, window[i].seq);
+                                                break;
+                                        }
+                                        printf("seq de %d = %d | ", i, window[i].seq );
+                                }
+                                printf("\n");
+
                                 break;
                 }
                 break;
         }
 
+        printf("Sai da operação, irei embora\n");
         fclose(arq); 
 
         return 0;
