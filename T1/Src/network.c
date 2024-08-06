@@ -311,10 +311,12 @@ int reenvia_ate_ACK(int sckt, struct networkFrame message, struct sockaddr_ll cl
                 }
 
                 switch(client_answer.type){
-                        case ACK:;
+                        case ACK:
+                                printf("Mensagem de %d reconhecida\n", message.type);
                                 acked = 1; 
                                 break;
                         case NACK:
+                                printf("NACK na mensagem %d\n", message.type);
                                 sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
                                 break;
                         case ERRO: 
