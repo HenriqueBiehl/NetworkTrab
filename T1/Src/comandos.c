@@ -631,7 +631,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                 int received_window = 0; 
                 while(received_window < TAM_JANELA) {
                         
-                        print("Recebendo Janelas...\n");
+                        printf("Recebendo Janelas...\n");
                         rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
                         if (rec < 0) {
                                 perror("Erro ao receber mensagem");
