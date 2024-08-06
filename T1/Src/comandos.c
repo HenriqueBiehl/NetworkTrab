@@ -686,8 +686,8 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                 for(int i = 0; i < received_window && i < index_failure; ++i) {
                         if (window[i].type == DADOS) {
                                 printf("Baixando(%d)...\n", count++);
-                                printFrame(received);
-                                fwrite(received.data, sizeof(char), received.size, baixado);
+                                printFrame(window[i]);
+                                fwrite(window[i].data, sizeof(char), window[i].size, baixado);
                         }
                         if (window[i].type == FIM_TX) {
                                 fim_op = 1;
