@@ -63,9 +63,9 @@ int main(){
                                         break;
 
                                 case(BAIXAR):
-                                        server_baixar(sckt, client_addr, message);
-                                        //server_baixar_janela_deslizante(sckt, client_addr, message);
-                                        exit(0);
+                                        //server_baixar(sckt, client_addr, message);
+                                        server_baixar_janela_deslizante(sckt, client_addr, message);
+                                        //exit(0);
                                         break;
                         }
                 }

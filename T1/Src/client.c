@@ -47,8 +47,8 @@ int main(){
                                 break;
 
                         case (CMD_BAIXAR):
-                                client_baixar(sckt, server_addr);
-                                //client_baixar_janela_deslizante(sckt, server_addr);
+                                //client_baixar(sckt, server_addr);
+                                client_baixar_janela_deslizante(sckt, server_addr);
                                 break;
 
                         case (CMD_SAIR):
