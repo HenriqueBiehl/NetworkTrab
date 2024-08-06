@@ -40,12 +40,12 @@ struct carta_t *vetor_cartas(char *data, unsigned int n, uint8_t num_cards){
     struct carta_t *v; 
     unsigned int index = 0;
     
-    //printf("Convertendo deck\n");
-
     v = malloc(num_cards*sizeof(struct carta_t));
+
+    if(!v)
+        return NULL;
     
     for(int i = 0; i < n && index < num_cards; i+=3){
-        //printf("i:%c e i+1:%c\n", data[i], data[i+1]);
         v[index].num = converte_char_baralho(data[i]); 
         v[index].naipe = converte_char_naipe(data[i+1]);
         index++;
@@ -304,6 +304,43 @@ void print_fim_jogo(char *data, unsigned int n, int maxHand){
     else 
         printf("JOGADOR %d GANHOU COM %d VIDAS! *foguinhos*\n", index_vencedor, maior_vida);
     printf("\n");
+}
+
+int apostar(int round){
+    int a, ok = 0; 
+
+    printf("Faça sua aposta para a rodada com %d:", round);
+    scanf("%d",&a);
+
+    while(!ok){
+        if(a <= round && a >= 0){
+            ok = 1;
+        }
+        else{
+            printf("ERRO: Sua aposta deve estar entre 1 e %d\nAposte novamente:", round);
+            scanf("%d",&a);
+        }
+    }
+
+    return a;
+}
+
+int escolhe_cartas(struct carta_t *v, int n){
+    int c, ok = 0; 
+
+    printf("Escolha sua carta:");
+    scanf("%d",&c);
+
+    while(!ok){
+        if((c-1 >= 0 && c-1 < n) && v[c-1].num != USADA)
+            ok = 1;
+        else{
+            printf("ERRO: Carta Inválida. OTÀRIO\nEscolha de novo:");
+            scanf("%d",&c);
+        }
+    }
+
+    return c-1;
 }
 
 char converte_numero_baralho(unsigned int i){
@@ -600,33 +637,3 @@ void header_jogo_dane_se() {
     printf("⠯⠀⠀⠀⠒⠀⠀⠀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⡄⠈⠳⠀⠀⠀⠀\n");
     printf("⠀⠀⢀⣀⣀⡀⣼⣤⡟⣬⣿⣷⣤⣀⣄⣀⡀⠀⠀⠀⠀⠀⠀⠈⣿⣿⡄⣉⡀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⣿⣿⣄⠀⣀⣀⡀⠀\n");
 }
-
-
-
-/******************************** PARA DELEÇÃO ********************************/
-
-/*struct message_frame seta_mensagem_shuffle(unsigned int *baralho, int dest_index, uint8_t round, int n){
-    struct message_frame cards; //Frame com as cartas a serem enviadas
-
-    struct carta_t *deck; //Vetor que representará a 'mão' de cartas 
-
-    deck = malloc(n*sizeof(struct carta_t)); //Aloca o "deck" que será enviado 
-    gera_cartas_aleatorias(deck, baralho, n); //Gera as cartas do deck marcando como usada no baralho
-
-    //Inicializa o frame com os dados necessários 
-    cards.start = START;
-    cards.flag  = SHUFFLE_FLAG;
-    cards.dest  = dest_index;
-    cards.round = round;
-    memset(cards.data, 0, MAX_DATA_LENGHT+1);
-
-    //Converte o vetor deck para uma string formatada em cards.data. Recebe o ponteo de cards.size para salvar o tamanho//
-    mao_baralho(deck, n, &cards.size, cards.data);
-    cards.num_cards = n; 
-    cards.size++; //Adiciona o tamanho do '\0'
-
-    //Libera o vetor do deck q nn será mais útil
-    free(deck);
-
-    return cards;
-}*/

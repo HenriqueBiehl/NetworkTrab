@@ -4,202 +4,41 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <time.h>
-#include "lib_cards.h"
 
+#include "lib_token_ring.h"
 
-#define PORT_BASE 5000
-#define BUF_SIZE 256
-#define NUM_NODES 4
-#define MAX_DATA_LENGHT 2048
-
-#define TOKEN_RING_SIZE 66
-#define TOKEN_SIZE 64
-#define FRAME_SIZE 2058
-
-
-#define START 0x7e
-#define SHUFFLE_FLAG 0 
-#define BET_FLAG 1
-#define MATCH_FLAG 2 
-#define RESULTS_FLAG 3
-#define ALL_BETS_FLAG 4
-#define MATCH_RESULTS_FLAG 5
-#define END_GAME_FLAG 255
-
-
-#define LOCAL_PORT 12346                  // Porta local de recepção
-
-#define MAX_CARTAS_MAO 9
-#define TAM_BARALHO 40
-#define VIDAS_MAX 4
-
-struct message_frame{
-    uint8_t start;                        //Bits de inicio transmissão
-    unsigned int size;                    //Define o tamanho do campo *data
-    uint8_t dest;                         //Define o índice de destino
-    uint8_t flag;                         //Flags que definem o "momento do jogo" (embaralhamento, aposta, partida, resultados)
-    uint8_t round;                        //Determina em qual rodada está o jogo 
-    uint8_t num_cards;                    //Informa quantas cartas estão presentes na rodada
-    char data[MAX_DATA_LENGHT+1];         //Campo de dados onde são enviados os dados da partida 
-};
-
-struct token_ring{
-    uint8_t start;                        //Bits de inicio transmissão
-    char token[TOKEN_SIZE+1];
-};
-
-int bind_socket(int sock, struct sockaddr_in *addr, unsigned int port){
-    memset(addr, 0, sizeof(*addr));
-    addr->sin_family = AF_INET;
-    addr->sin_addr.s_addr = htonl(INADDR_ANY);
-    addr->sin_port = htons(port);
-
-    if(bind(sock, (struct sockaddr*)addr, sizeof(*addr)) == -1)
-        return 0; 
-
-    return 1;
+void cabecalhoAutores() {
+    printf("***********************************\n");
+    printf("*              Autores            *\n");
+    printf("***********************************\n");
+    printf("*                                 *\n");
+    printf("*   Caio Henrique Ramos Rufino    *\n");
+    printf("*          GRR20224386            *\n");
+    printf("*                                 *\n");
+    printf("*   Frank Wolff Hannemann         *\n");
+    printf("*          GRR20224758            *\n");
+    printf("*                                 *\n");
+    printf("*   Henrique de Oliveira Biehl    *\n");
+    printf("*          GRR20221257            *\n");
+    printf("*                                 *\n");
+    printf("***********************************\n");
 }
-
-void setar_nodo_mult_maquinas(struct sockaddr_in *node, char *ip_next_node, unsigned short port){
-    memset(node, 0, sizeof(*node));
-    node->sin_family = AF_INET;
-    node->sin_port = htons(port);
-    if (inet_pton(AF_INET, ip_next_node, &node->sin_addr) <= 0) {
-        perror("invalid address/ Address not supported");
-    }
-
-}
-
-void setar_nodo_loop_back(struct sockaddr_in *node, unsigned int index){
-    memset(node, 0, sizeof(*node));
-    node->sin_family = AF_INET;
-    node->sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // Para simplicidade, usando loopback
-    node->sin_port = htons(PORT_BASE +index);
-}
-
-struct token_ring incializa_token(){
-    struct token_ring t;
-
-    t.start = START;
-    memset(t.token, 0, TOKEN_SIZE+1);
-
-    return t;
-}
-
-void preparar_mensagem(struct message_frame *frame, char *data, unsigned int size, int flag, int round, int num_cards, uint8_t dest){
-    frame->start = START;
-    frame->size  = size;
-    frame->dest = dest;
-    frame->flag  = flag;
-    frame->round = round;
-    frame->num_cards = num_cards;
-    memset(frame->data, 0, MAX_DATA_LENGHT+1);
-    memcpy(frame->data, data, size+1);
-}
-
-void gera_mensagem_resultado(char *data, unsigned int *tam, struct carta_t *r, uint8_t n, uint8_t ganhador, struct carta_t gato){
-    char buff[5];
-    uint8_t nm; 
-    uint8_t np;
-
-    memset(buff, 0, 5);
-    snprintf(buff,5, "%c%c@", converte_numero_baralho(gato.num), converte_numero_naipe(gato.naipe));
-    strcat(data, buff);
-    
-    nm = r[ganhador].num; 
-    np = r[ganhador].naipe; 
-    memset(buff, 0, 5);
-    snprintf(buff, 5,"%c%c%c|", converte_int_char(ganhador), converte_numero_baralho(nm), converte_numero_naipe(np));
-    strcat(data, buff);
-
-    for(int i=0; i < n; ++i){
-        memset(buff, 0, 5);
-        nm = r[i].num; 
-        np = r[i].naipe; 
-        snprintf(buff, 5 ,"%c%c%c|",converte_int_char(i), converte_numero_baralho(nm), converte_numero_naipe(np));
-        strcat(data, buff);
-    }
-    *tam = strlen(data); 
-}
-
-void gera_mensagem_partida(char *data, unsigned int *tam, uint8_t *apostas, uint8_t *vitorias, uint8_t *vidas , uint8_t n){
-    char buff[6];
-
-    for(int i=0; i < n; ++i){
-        memset(buff, 0, 6);
-        snprintf(buff, 6 ,"%c%c%c%c|",converte_int_char(i), converte_int_char(apostas[i]), converte_int_char(vitorias[i]), converte_int_char(vidas[i]));
-        strcat(data, buff);
-    }
-    *tam = strlen(data); 
-}
-
-void gerar_mensagem_fim_jogo(char *data, unsigned int *tam, uint8_t *vidas, unsigned int n){
-    char buff[4];
-    
-    for(int i=0; i < n; ++i){
-        memset(buff, 0, 4);
-        snprintf(buff, 4 ,"%c%c|",converte_int_char(i), converte_int_char(vidas[i]));
-        strcat(data, buff);
-    }
-
-    *tam = strlen(data);
-}
-
-
-int apostar(int round){
-    int a, ok = 0; 
-
-    printf("Faça sua aposta para a rodada com %d:", round);
-    scanf("%d",&a);
-
-    while(!ok){
-        if(a <= round && a >= 0){
-            ok = 1;
-        }
-        else{
-            printf("ERRO: Sua aposta deve estar entre 1 e %d\nAposte novamente:", round);
-            scanf("%d",&a);
-        }
-    }
-
-    return a;
-}
-
-int escolhe_cartas(struct carta_t *v, int n){
-    int c, ok = 0; 
-
-    printf("Escolha sua carta:");
-    scanf("%d",&c);
-
-    while(!ok){
-        if((c-1 >= 0 && c-1 < n) && v[c-1].num != USADA)
-            ok = 1;
-        else{
-            printf("ERRO: Carta Inválida. OTÀRIO\nEscolha de novo:");
-            scanf("%d",&c);
-        }
-    }
-
-    return c-1;
-}
-
-
-void receber_token(int sock, struct token_ring *node_token ,struct sockaddr_in from_addr, socklen_t addr_size){
-    char token_buffer[TOKEN_RING_SIZE+1];
-
-    //printf("Recebendo o token\n");
-    if (recvfrom(sock, token_buffer, TOKEN_RING_SIZE, 0, (struct sockaddr*)&from_addr, &addr_size) < 0)
-        perror("No token received\n");            
-    memcpy(node_token, token_buffer, TOKEN_RING_SIZE);
-}
-
 
 int main(int argc, char *argv[]){
+    
+    if((argc != 2) && (argc != 4)){
+        printf("ERRO: argumentos inválidos, utilize:\n");
+        printf("    1. USO EM LOOPBACK:             ./dane-se <index 0 a 3>\n");
+        printf("    2. USO COM MÚLTIPLAS MÁQUINAS:  ./dane-se <index 0 a 3> <ip do próximo jogador> <port>\n");
+        return 1;
+    }
+
+    cabecalhoAutores();
     header_jogo_dane_se();
 
     int sock, index; 
     struct sockaddr_in my_addr, next_node_addr, from_addr;   
-    uint8_t MASTER_FLAG, dest;
+    uint8_t dest, MASTER_FLAG;
     uint8_t *vidas; 
     uint8_t *apostas;
     uint8_t *vitorias;
@@ -213,22 +52,18 @@ int main(int argc, char *argv[]){
 
     struct token_ring node_token = incializa_token();
     char token[TOKEN_SIZE+1];
-    char token_buffer[TOKEN_RING_SIZE+1];
 
     snprintf(token, TOKEN_SIZE+1,"3SAwABfnXZAPSr9zIjoWtA4rcJNRcZjSSYlLnBcSKwpthrOc9Tv7xNrIYrxzcqi6");
-    memset(token_buffer, 0, TOKEN_SIZE+1);
 
     unsigned int *baralho;
     struct carta_t *deck;
 
     index = atoi(argv[1]);
     int next_node_index = (index + 1) % NUM_NODES;
-    printf("Index: %d\n", index);
 
     if(argc == 4){
-        printf("** Uso com múltiplas maquinas **");
+        printf("Modo multiplayer\n");
         port = atoi(argv[3]);
-        // Converter IP de string para endereço binário
         setar_nodo_mult_maquinas(&next_node_addr, argv[2], port);
     }
     else {
@@ -237,60 +72,69 @@ int main(int argc, char *argv[]){
     }
 
     sock = socket(PF_INET, SOCK_DGRAM,0 );
-    if(sock == -1)
+    if(sock == -1){
         perror("Falha ao criar socket\n");
+        exit(1);
+    }
 
-    if(!bind_socket(sock, &my_addr, port))
+    if(!bind_socket(sock, &my_addr, port)){
         perror("Falha no bind do socket\n");
+        close(sock);
+        exit(1);
+    }
     
-    //printf("Socket para %d: %d\n", index, sock);
-
     socklen_t addr_size;
 
     int opt; 
 
-    printf("\n@@@@@@@@@@@@ INICIAR JOGO @@@@@@@@@@@@\n");
+    printf("\n@@@@@@@@@@@@ INICIAR JOGO: JOGADOR %d @@@@@@@@@@@@\n", index);
     printf("\n[1]- Sim\n[2]- Sair\nEscolha:");
     scanf("%d", &opt);
-    printf("\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+    printf("\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
     if(opt == 2){
         close(sock);
-        return 1;
+        return 0;
     }
 
+    srand(time(NULL));
+
+    //Indíce 0 age como carteador e mestre da partida sempre
     if(index == 0){
-        MASTER_FLAG = SHUFFLE_FLAG;    //Flag que só o indice 0 (o mestre do jogo) possui indicando o que ele deve fazer na rede; 
-        dest = 0;
+        MASTER_FLAG = SHUFFLE_FLAG;      //Váriavel que define o comportamento que o mestre do jogo deve ter
+        dest = 0;                       //Marcador que indica o destino que 0 deve enviar as cartas embaralhadas
         strcpy(node_token.token, token);
         memset(&message, 0 , FRAME_SIZE);
 
-
+        //Vetor que 0 gerencia contendo a vida dos jogadores (cada indice é um jogador). Inicia com o valor de VIDA_MAX
         vidas = malloc(sizeof(uint8_t)*NUM_NODES);
         memset(vidas, VIDAS_MAX, NUM_NODES);
 
+        //Vetor que gerencia as apostas dos jogadores (cada indice é um jogador)
         apostas = malloc(sizeof(uint8_t)*NUM_NODES);
         memset(apostas, 0, NUM_NODES);
 
+        //Vetor que gerencia as vitorias dos jogadores (cada indice é um jogador)
         vitorias = malloc(sizeof(uint8_t)*NUM_NODES);
         memset(vitorias, 0, NUM_NODES);
         
+        //Vetor que gerencia as rodada as cartas jogadas pelos jogadores (cada indice é um jogador)
         rodada = malloc(sizeof(struct carta_t)*NUM_NODES);
-        memset(rodada, 0, NUM_NODES);
+        memset(rodada, 0, sizeof(struct carta_t)*NUM_NODES);
         
+        //Vetor que gerencia o baralho de TAM_BARALHO. Cada indice é uma carta e o baralho é inicializado como 0 
+        //Significando que nenhuma carta esta sendo utlizada
         baralho = malloc(sizeof(unsigned int)*TAM_BARALHO);
         memset(baralho, 0, TAM_BARALHO*sizeof(unsigned int));
-
-
     }
 
-    struct carta_t carta, gato; 
-    int cartas_mao = 1; 
-    int round = 1;
-    int aposta;     
-    int ganhador;
-    uint8_t contVidas = VIDAS_MAX;
+    struct carta_t carta, gato;
+    int cartas_mao = 1;              //Marca quantas cartas há na "mão" da rodada
+    int round = 1;                   //Marca em qual rodada da "mão" o jogo esta
+    int aposta;                      //Salva apostas dos jogadores
+    int ganhador;                    //Salva o indice do ganhador da rodada
+    uint8_t contVidas = VIDAS_MAX;   //Contador das vidas dos jogadores 
 
-    while(1){
+        while(1){
 
         /* Sequência de operações para quando se tem o token*/
         if(node_token.start == START){
@@ -678,4 +522,5 @@ int main(int argc, char *argv[]){
     }
        
     close(sock);
+    return 0;
 }
