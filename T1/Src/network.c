@@ -287,6 +287,7 @@ int reenvia_ate_ACK(int sckt, struct networkFrame message, struct sockaddr_ll cl
         int acked = 0;
         while(!acked){
 
+                printf("Recebendo resposta\n");
                 int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
                 if (ret < 0) {
                         perror("Erro ao receber mensagem");

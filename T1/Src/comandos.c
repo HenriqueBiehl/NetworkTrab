@@ -428,13 +428,13 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
         int i = 0;
         if(!arq) {
                 /* Verifica se o erro foi de permissão ou de "não encontrado"*/
-                if(access(arq_path, R_OK) == -1){
-                        printf("Erro: você nao tem permissão para acessar o arquivo\n");
-                        snprintf(name_buffer, 18,"Permissão Negada\n");
-                }
-                else{
+                if(access(arq_path, F_OK) == -1){
                         printf("Erro: nao encontrado\n");
                         snprintf(name_buffer, 15,"Nao econtrado\n");
+                }
+                else{
+                        printf("Erro: você nao tem permissão para acessar o arquivo\n");
+                        snprintf(name_buffer, 18,"Permissão Negada\n");
                 }
                 
                 server_msg = gerar_mensagem_erro(i, name_buffer);
@@ -615,6 +615,10 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                 sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr));
                 return 1;
         }        
+        else{
+                message = gerar_mensagem_resposta(0, ACK);
+                sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        }
 
         char stats_arq[25];
         memcpy(stats_arq, message.data, 25);
