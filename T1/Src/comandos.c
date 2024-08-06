@@ -646,6 +646,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                         }
 
                         if(received.start == START){
+                                int seq_esperado = (seq_checkpoint + 1) % TAM_JANELA;
                                 printf("A janela %d tem o start correto\n", received_window);
                                 //int crc8 = verifica_crc8((uint8_t*)&received, sizeof(received) - 1, message.crc8);
                                 //printf("crc8 calculado = %d, crc8 recebido = %d\n", crc8, message.crc8);
@@ -661,13 +662,15 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                                 }
 
                                 /* Significa que uma mensagem da sequencia deu problem na hora do envio (sequencia esta fora de ordem) */
-                                if (window[received_window].seq != (seq_checkpoint + 1) % TAM_JANELA){
+                                if (seq_checkpoint != seq_esperado){
                                         has_failures = 1;
-                                        seq_failure = (seq_checkpoint + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
+                                        seq_failure = (seq_esperado + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
                                         index_failure = received_window;
                                         printf("Problema na hora do envio (seq fora de ordem: %d recebido e %d esperado - seq_checkpoint %d) \n", window[received_window].seq, (seq_checkpoint + 1) % TAM_JANELA, seq_checkpoint);
                                         break;
                                 }
+
+                                printf("Janela %d esta correta\n", window[received_window].seq);
 
                                 memcpy(&window[received_window], &received, FRAME_SIZE);
                                 if(received.type == FIM_TX)
