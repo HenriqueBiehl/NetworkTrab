@@ -670,7 +670,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                                         break;
                                 }
 
-                                printf("Janela %d esta correta\n", window[received_window].seq);
+                                printf("Janela %d esta correta , RW %d\n", received.seq, received_window);
 
                                 memcpy(&window[received_window], &received, FRAME_SIZE);
                                 if(window[received_window].type == FIM_TX){
