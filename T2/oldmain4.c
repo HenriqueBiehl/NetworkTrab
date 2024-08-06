@@ -169,7 +169,6 @@ int main(int argc, char *argv[]){
                                                 struct carta_t *temp_deck;
                                                 temp_deck = malloc(cartas_mao*sizeof(struct carta_t)); //Aloca o "deck" que será enviado 
                                                 gera_cartas_aleatorias(temp_deck, baralho, cartas_mao); //Gera as cartas do deck marcando como usada no baralho
-                                                print_mao(temp_deck, cartas_mao, round);
                                                 mao_baralho(temp_deck, cartas_mao, &message.size, data_buffer);
                                                 free(temp_deck);
                                                 break;
@@ -180,7 +179,6 @@ int main(int argc, char *argv[]){
                                 }
 
                                 preparar_mensagem(&message, data_buffer, strlen(data_buffer)+1, SHUFFLE_FLAG, round, cartas_mao, dest);
-                                printf("%s para %d\n", message.data, dest);
 
                             }
                             else {
@@ -334,8 +332,6 @@ int main(int argc, char *argv[]){
                 }
             }
             
-            printf("enviando %s para %d em %d\n", message.data, message.dest, index);
-
             /* Envio da mensagem para o próximo nodo */
             if(sendto(sock, (char*)&message, FRAME_SIZE, 0, (struct sockaddr*)&next_node_addr, sizeof(next_node_addr))< 0) 
                 perror("Falha ao fazer sendto()\n");
