@@ -527,7 +527,6 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                                         printf("Sequencia de mensagens inicia em %d\n", seq);
                                 }
                                 break;
-
                         case NACK:
                                 printf("Nack do cliente em %d\n", client_answer.seq);
                                 seq = (seq + 1) % TAM_JANELA; //Sequencia avança em +1 na janela 
@@ -549,7 +548,6 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 
                                 break;
                 }
-                break;
         }
 
         printf("Sai da operação, irei embora\n");
