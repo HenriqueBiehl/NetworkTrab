@@ -22,6 +22,10 @@
 
 #define START 0x7e
 
+#define BYTE_FILL 0xff
+#define BYTE_PROIBIDO_1 0x81
+#define BYTE_PROIBIDO_2 0x88
+
 #define ACK 0
 #define NACK 1
 #define LISTA 10 
@@ -60,6 +64,8 @@ int verifica_crc8(uint8_t *data, size_t len, uint8_t crc_recebido);
 FILE *abrir_arquivo(char *nome, char *tipo);
 
 int sendto_verify(int sckt, const void *message, size_t length, struct sockaddr *dest_addr, socklen_t dest_len);
+
+int verifica_byte_proibido(char *buffer, size_t start_byte, size_t buffer_size);
 
 struct networkFrame gerar_mensagem_ack(uint8_t seq);
 

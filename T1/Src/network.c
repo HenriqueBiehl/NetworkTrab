@@ -61,6 +61,20 @@ int sendto_verify(int sckt, const void *message, size_t length, struct sockaddr 
         return ret;
 }
 
+
+int is_invalid_byte(uint8_t byte) {
+        return (byte == 0x81 || byte == 0x88);
+}
+
+int verifica_byte_proibido(char *buffer, size_t start_byte, size_t buffer_size) {
+        for (int i = start_byte; i < buffer_size; i++) {
+                if (is_invalid_byte(buffer[i])) {
+                        return -i; // Retorna a posição inválida mas negativa
+                }
+        }
+        return 1;
+}
+
 uint8_t calcula_crc8(uint8_t *data, size_t len) {
         uint8_t crc = 0x00;
         uint8_t polynomial = 0x07; // Polinômio padrão do CRC-8: x^8 + x^2 + x + 1
@@ -278,7 +292,12 @@ int reenvia_ate_ACK(int sckt, struct networkFrame message, struct sockaddr_ll cl
         struct networkFrame client_answer;
 
         socklen_t addr_len = sizeof(struct sockaddr_ll);
+#ifdef LOOPBACK
+        int ifindex = if_nametoindex("lo");
+#else
         int ifindex = if_nametoindex("eth0");
+#endif
+
         client_addr.sll_ifindex = ifindex;
         client_addr.sll_family = AF_PACKET;
         client_addr.sll_protocol = htons(ETH_P_ALL);

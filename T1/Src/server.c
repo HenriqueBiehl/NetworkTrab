@@ -42,8 +42,8 @@ int main(){
         client_addr.sll_family = AF_PACKET;
         client_addr.sll_protocol = htons(ETH_P_ALL);
 
-        //int ret = recvfrom(sckt, pack, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
         int ret;
+        //ret = recvfrom(sckt, message, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
         while(1) {
                 ret = recvfrom(sckt, (char *)&message, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
                 if (ret < 0) {
@@ -52,14 +52,8 @@ int main(){
                         return -1;
                 } else {
                         printf("Received packet from %s:\n", client_addr.sll_addr);
-                        //exit(1);
                 }
-
                 if(message.start == START){
-                        //printf("got it pal\n");
-                        //printf("%d bytes read. I shouldve got %d\n", ret, FRAME_SIZE);
-                        //printf("Type = %u\n", message.type);
-                        //printFrame(message);
                         switch(message.type) {
                                 case(ACK):
                                         printf("ACK, esperando proxima mensagem\n");
@@ -69,20 +63,13 @@ int main(){
                                         break;
 
                                 case(BAIXAR):
-                                        //server_baixar(sckt, client_addr, message);
-                                        server_baixar_janela_deslizante(sckt, client_addr, message);
+                                        server_baixar(sckt, client_addr, message);
+                                        //server_baixar_janela_deslizante(sckt, client_addr, message);
+                                        exit(0);
                                         break;
                         }
-
-                        /* CRC8 esta dando problema */
-                        /*if (verifica_crc8((uint8_t*)&message, sizeof(message) - 1, message.crc8)) {
-                          printf("crc deu boinas\n");
-                          }
-                          else {
-                          printf("num deu o crc\n");
-                          }*/
-
                 }
+
         }
 
         close(sckt);
