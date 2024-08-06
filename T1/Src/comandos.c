@@ -647,7 +647,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 
                         if(received.start == START){
                                 int seq_esperado = (seq_checkpoint + 1) % TAM_JANELA;
-                                printf("A janela %d tem o start correto\n", window[received_window].seq);
+                                printf("A janela %d tem o start correto\n", received.seq);
                                 //int crc8 = verifica_crc8((uint8_t*)&received, sizeof(received) - 1, message.crc8);
                                 //printf("crc8 calculado = %d, crc8 recebido = %d\n", crc8, message.crc8);
                                 //if (crc8) {
