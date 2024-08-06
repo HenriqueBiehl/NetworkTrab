@@ -164,35 +164,67 @@ void shift_bytes_fill(char *buffer, size_t inicio, size_t tamanho) {
 }
 
 // Retorna a quantidade de bytes fill removidos
+//int remove_fill_bytes(char *buffer, size_t tamanho) {
+//
+//        size_t read_index = 0;  // Índice para ler o buffer
+//        size_t write_index = 0; // Índice para escrever no buffer
+//        size_t bytes_removed = 0; // Contador de bytes removidos
+//                                  //
+//                                  // Percorre o buffer
+//        while (read_index < tamanho) {
+//                // Verifica se o byte atual é 0xff e se o byte anterior é 0x88 ou 0x81
+//                if (read_index > 0 && buffer[read_index] == (char)BYTE_FILL &&
+//                                (buffer[read_index - 1] == (char)BYTE_PROIBIDO_1 || buffer[read_index - 1] == (char)BYTE_PROIBIDO_2)) {
+//                        // Ignora o byte 0xff e incrementa o contador de remoção
+//                        read_index++;
+//                        bytes_removed++;
+//                } else {
+//                        // Copia o byte do índice de leitura para o índice de escrita
+//                        buffer[write_index] = buffer[read_index];
+//                        read_index++;
+//                        write_index++;
+//                }
+//        }
+//        // Opcional: Preencher o restante do buffer com zeros
+//        //while (write_index < tamanho) {
+//        //        buffer[write_index] = 0;
+//        //        write_index++;
+//        //}
+//
+//        return bytes_removed; // Retorna o número de bytes removidos
+//}
+
 int remove_fill_bytes(char *buffer, size_t tamanho) {
+    if (tamanho == 0) return 0;
 
-        size_t read_index = 0;  // Índice para ler o buffer
-        size_t write_index = 0; // Índice para escrever no buffer
-        size_t bytes_removed = 0; // Contador de bytes removidos
-                                  //
-                                  // Percorre o buffer
-        while (read_index < tamanho) {
-                // Verifica se o byte atual é 0xff e se o byte anterior é 0x88 ou 0x81
-                if (read_index > 0 && buffer[read_index] == (char)BYTE_FILL &&
-                                (buffer[read_index - 1] == (char)BYTE_PROIBIDO_1 || buffer[read_index - 1] == (char)BYTE_PROIBIDO_2)) {
-                        // Ignora o byte 0xff e incrementa o contador de remoção
-                        read_index++;
-                        bytes_removed++;
-                } else {
-                        // Copia o byte do índice de leitura para o índice de escrita
-                        buffer[write_index] = buffer[read_index];
-                        read_index++;
-                        write_index++;
-                }
-        }
-        // Opcional: Preencher o restante do buffer com zeros
-        while (write_index < tamanho) {
-                buffer[write_index] = 0;
-                write_index++;
-        }
+    size_t read_index = 0;  // Índice para ler o buffer
+    size_t write_index = 0; // Índice para escrever no buffer
+    size_t bytes_removed = 0; // Contador de bytes removidos
 
-        return bytes_removed; // Retorna o número de bytes removidos
+    while (read_index < tamanho) {
+        // Verifica se o byte atual é 0xff e se o byte anterior é 0x88 ou 0x81
+        if (read_index > 0 && buffer[read_index] == BYTE_FILL &&
+            (buffer[read_index - 1] == BYTE_PROIBIDO_1 || buffer[read_index - 1] == BYTE_PROIBIDO_2)) {
+            // Ignora o byte 0xff e incrementa o contador de remoção
+            read_index++;
+            bytes_removed++;
+            continue; // Pular o passo de cópia e continuar a leitura
+        }
+        // Copia o byte do índice de leitura para o índice de escrita
+        buffer[write_index] = buffer[read_index];
+        read_index++;
+        write_index++;
+    }
+
+    // Opcional: Preencher o restante do buffer com zeros, se desejado
+    // while (write_index < tamanho) {
+    //     buffer[write_index] = 0;
+    //     write_index++;
+    // }
+
+    return bytes_removed; // Retorna o número de bytes removidos
 }
+
 
 int client_listar(int sckt, struct sockaddr_ll server_addr) {
 
@@ -207,6 +239,7 @@ int client_listar(int sckt, struct sockaddr_ll server_addr) {
 
         socklen_t add_len = sizeof(struct sockaddr_in);
         struct networkFrame received;
+
 
         // Agora deve receber a mensagem
         int rec = recvfrom(sckt, (char *)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
@@ -354,20 +387,20 @@ int client_baixar(int sckt, struct sockaddr_ll server_addr) {
 
 int server_listar(int sckt, struct sockaddr_ll client_addr) {
 
-        //printf("LISTA\n");
+        printf("LISTA\n");
         FILE *buffer_lista = listar_no_buffer();
         char line[MAX_DATA_LENGHT];
         int i = 0;
         while (fgets(line, sizeof(line), buffer_lista)) {
                 //printf("&& %s\n", line);
                 struct networkFrame mensagem_atual = gerar_mensagem_enviar_mostra_tela(line, i++);
-                //printFrame(mensagem_atual);
+                printFrame(mensagem_atual);
 
                 sendto_verify(sckt, (char *)&mensagem_atual, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
                 //printf("%s", line);
         } 
         struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
-        //printf("enviando fim da tx\n");
+        printf("enviando fim da tx\n");
         sendto_verify(sckt, (char *)&mensagem_fim_tx, FRAME_SIZE,(struct sockaddr *)&client_addr, sizeof(client_addr));
 
         fclose(buffer_lista);
@@ -571,7 +604,11 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                 for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
                         bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
                         int bytes_proibidos = 0;
-                        check =  = verifica_byte_proibido(buffer, 0, bytes_read);
+			printf("mensagem antes de fazer o fill:\n");
+                        window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
+                        printFrame(window[i]);
+
+                        check = verifica_byte_proibido(buffer, 0, bytes_read);
                         while (check < 0) {
                                 bytes_proibidos++;
                                 //printf("byte(%d) = %c proibido\n", abs(check), buffer[abs(check)]);
@@ -592,7 +629,6 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                                 fseek(arq, -bytes_proibidos, SEEK_CUR);
                         } // Volta o leitor do arquivo pois os ultimos bytes da mensagem foram "empurrados pra fora do buffer"
 
-
                         window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
                         printf("Mensagem %d gerada\n", window[i].seq);
                         printFrame(window[i]);
@@ -607,6 +643,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
                         window[checkpoint_i] = gerar_mensagem_fim_tx(seq);
                         printf("======ENVIANDO O FIM DA TX=======\n");
                         msg_over = 1;
+                        end_operation = 1;
                 }
 
                 //Envia as mensagens da janela 
