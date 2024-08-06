@@ -454,6 +454,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
         char descritor_arq[25];
         empacotar_info_stat(arq_path, descritor_arq);
         server_msg = gerar_mensagem_descritor_arq(0, descritor_arq);
+        printf("Enviando descritor Arquivo\n");
         sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
         /* Significa que ele recebeu uma mensagem de ERRO reenvia_ate_ACK */
@@ -468,6 +469,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
         int index_startpoint = 0; //Indica o ponto de inicio para o indice da janela deslizante
         int seq = 0;              //Indica o número da sequencia de msgs na janela
 
+        printf("Iniciando operação das janelas deslizantes\n");
         while(!end_operation) {
 
                 for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
@@ -636,7 +638,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
                         if (rec < 0) {
                                 perror("Erro ao receber mensagem");
                         } else {
-                                printf("Recebida a janela %d\n", received_window);
+                                printf("Recebida a janela %d \n", received_window);
                         }
 
                         if(received.start == START){
