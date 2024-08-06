@@ -24,7 +24,7 @@ int main(){
         //Procedimento para poder enviar informações
         //
         struct sockaddr_ll server_addr = {0};
-        int ifindex = if_nametoindex("lo");
+        int ifindex = if_nametoindex("eth0");
         server_addr.sll_ifindex = ifindex;
         server_addr.sll_family = AF_PACKET;
         server_addr.sll_protocol = htons(ETH_P_ALL);

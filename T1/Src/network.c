@@ -278,7 +278,7 @@ int reenvia_ate_ACK(int sckt, struct networkFrame message, struct sockaddr_ll cl
         struct networkFrame client_answer;
 
         socklen_t addr_len = sizeof(struct sockaddr_ll);
-        int ifindex = if_nametoindex("lo");
+        int ifindex = if_nametoindex("eth0");
         client_addr.sll_ifindex = ifindex;
         client_addr.sll_family = AF_PACKET;
         client_addr.sll_protocol = htons(ETH_P_ALL);

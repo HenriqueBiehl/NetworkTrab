@@ -397,7 +397,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
         FILE *arq;                        
 
         socklen_t addr_len = sizeof(struct sockaddr_ll);
-        int ifindex = if_nametoindex("lo");
+        int ifindex = if_nametoindex("eth0");
         client_addr.sll_ifindex = ifindex;
         client_addr.sll_family = AF_PACKET;
         client_addr.sll_protocol = htons(ETH_P_ALL);
