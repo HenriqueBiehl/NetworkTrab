@@ -20,8 +20,8 @@ int main(){
         int sckt = cria_raw_socket();
         struct networkFrame message;
 
-        bind_raw_socket(sckt, "lo");
-        setar_modo_promiscuo(sckt, "lo");
+        bind_raw_socket(sckt, "eth0");
+        setar_modo_promiscuo(sckt, "eth0");
 
         printf("sckt: %d\n", sckt);
         

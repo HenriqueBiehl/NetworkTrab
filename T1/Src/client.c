@@ -16,8 +16,8 @@ int main(){
         int sckt = cria_raw_socket();
 
         //memset(&server_addr, 0, sizeof(server_addr));
-        bind_raw_socket(sckt, "lo");
-        setar_modo_promiscuo(sckt, "lo");
+        bind_raw_socket(sckt, "eth0");
+        setar_modo_promiscuo(sckt, "eth0");
 
         printf("sckt: %d\n", sckt);
 
