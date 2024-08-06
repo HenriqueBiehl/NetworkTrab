@@ -273,3 +273,56 @@ void descritor_arquivo(char *nomeArquivo){
         system("cut -d' ' -f5,6,7,8 t1 > descritor");
         system("rm t1");
 }
+
+int reenvia_ate_ACK(int sckt, struct networkFrame message, struct sockaddr_ll client_addr){
+        struct networkFrame client_answer;
+
+        socklen_t addr_len = sizeof(struct sockaddr_ll);
+        int ifindex = if_nametoindex("lo");
+        client_addr.sll_ifindex = ifindex;
+        client_addr.sll_family = AF_PACKET;
+        client_addr.sll_protocol = htons(ETH_P_ALL);
+
+
+        int acked = 0;
+        while(!acked){
+
+                int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+                if (ret < 0) {
+                        perror("Erro ao receber mensagem");
+                        close(sckt);
+                        return -1;
+                } else {
+                        //printFrame(client_answer);
+                        //printf("Received packet from %s:\n", client_addr.sll_addr);
+                }
+
+                //int liberado = 0;
+                while(client_answer.start != START){
+                        ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+                        if (ret < 0) {
+                                perror("Erro ao receber mensagem");
+                                close(sckt);
+                                return -1;
+                        } else {
+                                //printFrame(client_answer);
+                                //printf("Received packet from %s:\n", client_addr.sll_addr);
+                        }
+                }
+
+                switch(client_answer.type){
+                        case ACK:;
+                                acked = 1; 
+                                break;
+                        case NACK:
+                                sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+                                break;
+                        case ERRO: 
+                                printf("ERRO: %s", client_answer.data);
+                                return 0;
+                                break;
+                }
+        }
+
+        return 1;
+}

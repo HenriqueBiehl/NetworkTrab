@@ -92,4 +92,6 @@ void lista_conteudos();
 */
 void descritor_arquivo(char *nomeArquivo);
 
+int reenvia_ate_ACK(int sckt, struct networkFrame message, struct sockaddr_ll client_addr);
+
 #endif // NETWORK_H
