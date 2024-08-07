@@ -18,7 +18,7 @@ int main(){
         #else
                 char *interface = "eth0";
         #endif
-
+        printf("interface = %s\n", interface);
 
         int sckt = cria_raw_socket();
 
