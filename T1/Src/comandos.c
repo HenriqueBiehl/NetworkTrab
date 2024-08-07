@@ -662,10 +662,10 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
 			printFrame(window[i]);
 
-			//check = trata_byte_proibido(buffer, &bytes_read);
+			check = trata_byte_proibido(buffer, &bytes_read);
 			
-			//if(check > 0)
-			//	fseek(arq, -check, SEEK_CUR);
+			if(check > 0)
+				fseek(arq, -check, SEEK_CUR);
 
 			
 			/*while (check < 0) {
