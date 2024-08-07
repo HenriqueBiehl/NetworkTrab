@@ -163,6 +163,37 @@ void shift_bytes_fill(char *buffer, size_t inicio, size_t tamanho) {
         printf("\n>>>>> char inicio = %c\n", buffer[inicio]);
 }
 
+void shift_left_bytes(char *buffer, size_t tamanho, size_t index){
+	
+	for(int i = index + 1; i < tamanho - 1; ++i){
+		b[i] = b[i+1]; 
+	}
+}
+
+
+int trata_byte_proibido(char *buffer, size_t *tam){
+	int count = 0; 
+	
+	for(int i = 0; i < *tam - 1; ++i){
+		
+		if(buffer[i] == (char) BYTE_PROIBIDO_1 || buffer[i] == (char) BYTE_PROIBIDO_2){
+			shift_bytes_fill(buffer, i, *tam);
+			count++;	
+			if(*tam < MAX_DATA_LENGHT)
+				*tam++;
+		}
+	}
+	
+	
+	if(buffer[*tam-1] == (char) BYTE_PROIBIDO_1 || buffer[*tam-1] == (char) BYTE_PROIBIDO_2){
+		buffer[*tam-1] = '\0';
+		*tam--;
+		count++;
+	}
+
+	return count;
+}
+
 // Retorna a quantidade de bytes fill removidos
 //int remove_fill_bytes(char *buffer, size_t tamanho) {
 //
@@ -182,7 +213,7 @@ void shift_bytes_fill(char *buffer, size_t inicio, size_t tamanho) {
 //                        // Copia o byte do índice de leitura para o índice de escrita
 //                        buffer[write_index] = buffer[read_index];
 //                        read_index++;
-//                        write_index++;
+//              i          write_index++;
 //                }
 //        }
 //        // Opcional: Preencher o restante do buffer com zeros
@@ -194,14 +225,25 @@ void shift_bytes_fill(char *buffer, size_t inicio, size_t tamanho) {
 //        return bytes_removed; // Retorna o número de bytes removidos
 //}
 
-int remove_fill_bytes(char *buffer, size_t tamanho) {
+size_t remove_fill_bytes(char *buffer, size_t tamanho) {
     if (tamanho == 0) return 0;
 
     size_t read_index = 0;  // Índice para ler o buffer
     size_t write_index = 0; // Índice para escrever no buffer
     size_t bytes_removed = 0; // Contador de bytes removidos
 
-    while (read_index < tamanho) {
+	for(int i = 0; i < tamanho - 1; ++i){
+		
+		if(buffer[i] == (char) BYTE_PROIBIDO_1 || buffer[i] == (char) BYTE_PROIBIDO_2){
+			shift_bytes_left(buffer, tamanho, i); 
+			tamanho--;
+			
+
+		}
+	}
+	return tamanho;
+}
+    /*while (read_index < tamanho) {
         // Verifica se o byte atual é 0xff e se o byte anterior é 0x88 ou 0x81
         if (read_index > 0 && buffer[read_index] == BYTE_FILL &&
             (buffer[read_index - 1] == BYTE_PROIBIDO_1 || buffer[read_index - 1] == BYTE_PROIBIDO_2)) {
@@ -221,7 +263,7 @@ int remove_fill_bytes(char *buffer, size_t tamanho) {
     //     buffer[write_index] = 0;
     //     write_index++;
     // }
-
+	*/
     return bytes_removed; // Retorna o número de bytes removidos
 }
 
@@ -451,457 +493,475 @@ int server_baixar(int sckt, struct sockaddr_ll client_addr, struct networkFrame 
                 //criar loop para preencher a janela. Para quando a janela estiver preenchida ou o arquivo acabou       
                 bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
                 printf("bytes read = %ld\n", bytes_read);
+                
+		struct networkFrame mensagem_dados;
 
                 int bytes_proibidos = 0;
+		int ultimo_byte = 0;
                 int check = verifica_byte_proibido(buffer, 0, bytes_read);
                 while (check < 0) {
-                        bytes_proibidos++;
-                        printf("byte(%d) = %c proibido\n", abs(check), buffer[abs(check)]);
-                        printf("buffer antes do fill = \n");
-                        for (int i = 0; i < bytes_read; i++) {
-                                printf("%x", buffer[i]);
-                        }
-                        shift_bytes_fill(buffer, abs(check), bytes_read);
-                        printf("buffer apos o fill = \n");
-                        for (int i = 0; i < bytes_read; i++) {
-                                printf("%x", buffer[i]);
-                        }
-                        //preencher byte com BYTE_FILL
-                        //
-                        check = verifica_byte_proibido(buffer, abs(check) + 2, bytes_read);
-                }
-                if (bytes_proibidos > 0) {
-                        fseek(arq, -bytes_proibidos, SEEK_CUR);
-                } // Volta o leitor do arquivo pois os ultimos bytes da mensagem foram "empurrados pra fora do buffer"
+			// Se for o ultimo byte
+			if (abs(check) == MAX_DATA_LENGHT - 1) {
+				ultimo_byte = 1;
+				mensagem_dados = gerar_mensagem_dados(i, buffer, bytes_read - 1);
+				fseek(arq, -1, SEEK_CUR);
+				break;
+			}
+			bytes_proibidos++;
+			printf("byte(%d) = %c proibido\n", abs(check), buffer[abs(check)]);
+			printf("buffer antes do fill = \n");
+			for (int i = 0; i < bytes_read; i++) {
+				printf("%x", buffer[i]);
+			}
+			shift_bytes_fill(buffer, abs(check), bytes_read);
+			printf("buffer apos o fill = \n");
+			for (int i = 0; i < bytes_read; i++) {
+				printf("%x", buffer[i]);
+			}
+			//preencher byte com BYTE_FILL
+			//
+			check = verifica_byte_proibido(buffer, abs(check) + 2, bytes_read);
+		}
+		if (bytes_proibidos > 0) {
+			fseek(arq, -bytes_proibidos, SEEK_CUR);
+		} // Volta o leitor do arquivo pois os ultimos bytes da mensagem foram "empurrados pra fora do buffer"
 
-                struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, bytes_read);
-                //Adicionar i a janela_deslizante
-                printf("enviando mensagem_dados %d\n", i);
-                printFrame(mensagem_dados);
+		if (!ultimo_byte) {
+			mensagem_dados = gerar_mensagem_dados(i, buffer, bytes_read);
+		}
+		//Adicionar i a janela_deslizante
+		printf("enviando mensagem_dados %d\n", i);
+		printFrame(mensagem_dados);
 
-                //Envia de acordo com tamanho da janela (e deve vir depois do loop)
-                if (sendto_verify(sckt, (char*)&mensagem_dados, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr))){
-                        i++;
-                }
-                //Ao enviar, aguarda o ACK/NACK do cliente
+		//Envia de acordo com tamanho da janela (e deve vir depois do loop)
+		if (sendto_verify(sckt, (char*)&mensagem_dados, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr))){
+			i++;
+		}
+		//Ao enviar, aguarda o ACK/NACK do cliente
 
-                //Caso receba um NACK, reinicia i e deixa no vetor da janela as mensagens que ainda não foram confirmadas
-                //Caso ACK, reinicia i e faz uma outra leitura em loop dessa (FIM_TX vai nessa tbm)
-                while (!feof(arq)) {
-                        bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
-                        struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, bytes_read);
-                        printf("enviando mensagem_dados %d\n", i);
-                        printFrame(mensagem_dados);
-                        if (sendto_verify(sckt, (char*)&mensagem_dados, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr))){
-                                i++;
-                        }
-                }
-                struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
-                printf("ENVIANDO O FIM DA TX........................\n");
+		//Caso receba um NACK, reinicia i e deixa no vetor da janela as mensagens que ainda não foram confirmadas
+		//Caso ACK, reinicia i e faz uma outra leitura em loop dessa (FIM_TX vai nessa tbm)
+		while (!feof(arq)) {
+			bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
+			struct networkFrame mensagem_dados = gerar_mensagem_dados(i, buffer, bytes_read);
+			printf("enviando mensagem_dados %d\n", i);
+			printFrame(mensagem_dados);
+			if (sendto_verify(sckt, (char*)&mensagem_dados, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr))){
+				i++;
+			}
+		}
+		struct networkFrame mensagem_fim_tx = gerar_mensagem_fim_tx(i++);
+		printf("ENVIANDO O FIM DA TX........................\n");
 
-                //printFrame(mensagem_fim_tx);
-                sendto_verify(sckt, (char*)&mensagem_fim_tx, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+		//printFrame(mensagem_fim_tx);
+		sendto_verify(sckt, (char*)&mensagem_fim_tx, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
-                fclose(arq);
-        }
+		fclose(arq);
+	}
 
-        return 0;
+	return 0;
 }
 
 int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, struct networkFrame message) {
 
-        printf("BAIXAR JANELA DESLIZANTES: %s\n", message.data);
-        char arq_path[128];
-        char name_buffer[63];
-        char buffer[63];
-        struct networkFrame window[5];
-        struct networkFrame server_msg; 
-        struct networkFrame client_answer;
-        FILE *arq;                        
+	printf("BAIXAR JANELA DESLIZANTES: %s\n", message.data);
+	char arq_path[128];
+	char name_buffer[63];
+	char buffer[63];
+	struct networkFrame window[5];
+	struct networkFrame server_msg; 
+	struct networkFrame client_answer;
+	FILE *arq;                        
 
-        socklen_t addr_len = sizeof(struct sockaddr_ll);
+	socklen_t addr_len = sizeof(struct sockaddr_ll);
 #ifdef LOOPBACK
-        int ifindex = if_nametoindex("lo");
+	int ifindex = if_nametoindex("lo");
 #else
-        int ifindex = if_nametoindex("eth0");
+	int ifindex = if_nametoindex("eth0");
 #endif
-        client_addr.sll_ifindex = ifindex;
-        client_addr.sll_family = AF_PACKET;
-        client_addr.sll_protocol = htons(ETH_P_ALL);
+	client_addr.sll_ifindex = ifindex;
+	client_addr.sll_family = AF_PACKET;
+	client_addr.sll_protocol = htons(ETH_P_ALL);
 
-        if (!verifica_crc8((uint8_t*)&message + 1, sizeof(message) - 2, message.crc8)){
-                server_msg = gerar_mensagem_resposta(0, NACK);
-                sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
-        }
-
-
-        memset(window, 0, FRAME_SIZE*5);
-        memset(name_buffer, 0, 63);
-        strcpy(arq_path, DIR_CONTEUDOS);
-        memcpy(name_buffer, message.data, message.size);
-        strcat(arq_path, name_buffer);
+	if (!verifica_crc8((uint8_t*)&message + 1, sizeof(message) - 2, message.crc8)){
+		server_msg = gerar_mensagem_resposta(0, NACK);
+		sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+	}
 
 
-        printf("%s", arq_path);
-        for (int i = 0; i < strlen(arq_path); i++) {
-                printf("%c ", arq_path[i]);
-        }
+	memset(window, 0, FRAME_SIZE*5);
+	memset(name_buffer, 0, 63);
+	strcpy(arq_path, DIR_CONTEUDOS);
+	memcpy(name_buffer, message.data, message.size);
+	strcat(arq_path, name_buffer);
 
-        // Abre o arquivo em read binary
-        arq = abrir_arquivo(arq_path, "rb");
-        size_t bytes_read;
-        memset(buffer, 0, 63);
 
-        int i = 0;
-        if(!arq) {
-                /* Verifica se o erro foi de permissão ou de "não encontrado"*/
-                if(access(arq_path, F_OK) == -1){
-                        printf("Erro: nao encontrado\n");
-                        snprintf(name_buffer, 15,"Nao econtrado\n");
-                }
-                else{
-                        printf("Erro: você nao tem permissão para acessar o arquivo\n");
-                        snprintf(name_buffer, 18,"Permissão Negada\n");
-                }
+	printf("%s", arq_path);
+	for (int i = 0; i < strlen(arq_path); i++) {
+		printf("%c ", arq_path[i]);
+	}
 
-                server_msg = gerar_mensagem_erro(i, name_buffer);
-                printf("enviando mensagem_erro\n");
-                //memcpy(msg, &mensagem_erro, FRAME_SIZE);
-                //
-                sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+	// Abre o arquivo em read binary
+	arq = abrir_arquivo(arq_path, "rb");
+	size_t bytes_read;
+	memset(buffer, 0, 63);
 
-                return -1;
-        }
-        else{
-                server_msg = gerar_mensagem_resposta(0, ACK);
-                sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+	int i = 0;
+	if(!arq) {
+		/* Verifica se o erro foi de permissão ou de "não encontrado"*/
+		if(access(arq_path, F_OK) == -1){
+			printf("Erro: nao encontrado\n");
+			snprintf(name_buffer, 15,"Nao econtrado\n");
+		}
+		else{
+			printf("Erro: você nao tem permissão para acessar o arquivo\n");
+			snprintf(name_buffer, 18,"Permissão Negada\n");
+		}
 
-        }
+		server_msg = gerar_mensagem_erro(i, name_buffer);
+		printf("enviando mensagem_erro\n");
+		//memcpy(msg, &mensagem_erro, FRAME_SIZE);
+		//
+		sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
-        char descritor_arq[25];
-        empacotar_info_stat(arq_path, descritor_arq);
-        server_msg = gerar_mensagem_descritor_arq(0, descritor_arq);
-        printf("Enviando descritor Arquivo\n");
-        sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+		return -1;
+	}
+	else{
+		server_msg = gerar_mensagem_resposta(0, ACK);
+		sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
-        /* Significa que ele recebeu uma mensagem de ERRO reenvia_ate_ACK */
-        if(!reenvia_ate_ACK(sckt, server_msg, client_addr)){
-                fclose(arq);
-                return 1;
-        }
+	}
 
-        int checkpoint_i;         //Salva o indice do último elemento inserido na janela, útil para saber seu tamanho real
-        int msg_over = 0;         //Flag que indica que o arquivo chegou ao fim
-        int end_operation = 0;    //Flag que indica fim da operaçao de envio de arquivos
-        int index_startpoint = 0; //Indica o ponto de inicio para o indice da janela deslizante
-        int seq = 0;              //Indica o número da sequencia de msgs na janela
+	char descritor_arq[25];
+	empacotar_info_stat(arq_path, descritor_arq);
+	server_msg = gerar_mensagem_descritor_arq(0, descritor_arq);
+	printf("Enviando descritor Arquivo\n");
+	sendto_verify(sckt, (char*)&server_msg, FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 
-        printf("Iniciando operação das janelas deslizantes\n");
-        while(!end_operation) {
+	/* Significa que ele recebeu uma mensagem de ERRO reenvia_ate_ACK */
+	if(!reenvia_ate_ACK(sckt, server_msg, client_addr)){
+		fclose(arq);
+		return 1;
+	}
 
-                int check;
-                checkpoint_i = index_startpoint;
-                for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
-                        bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
-                        int bytes_proibidos = 0;
+	int checkpoint_i;         //Salva o indice do último elemento inserido na janela, útil para saber seu tamanho real
+	int msg_over = 0;         //Flag que indica que o arquivo chegou ao fim
+	int end_operation = 0;    //Flag que indica fim da operaçao de envio de arquivos
+	int index_startpoint = 0; //Indica o ponto de inicio para o indice da janela deslizante
+	int seq = 0;              //Indica o número da sequencia de msgs na janela
+
+	printf("Iniciando operação das janelas deslizantes\n");
+	while(!end_operation) {
+
+		int check;
+		checkpoint_i = index_startpoint;
+		for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
+			bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
+			int bytes_proibidos = 0;
 			printf("mensagem antes de fazer o fill:\n");
-                        window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
-                        printFrame(window[i]);
+			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
+			printFrame(window[i]);
 
-                        check = verifica_byte_proibido(buffer, 0, bytes_read);
-                        while (check < 0) {
-                                bytes_proibidos++;
-                                //printf("byte(%d) = %c proibido\n", abs(check), buffer[abs(check)]);
-                                //printf("buffer antes do fill = \n");
-                                //for (int i = 0; i < bytes_read; i++) {
-                                //        printf("%x", buffer[i]);
-                                //}
-                                shift_bytes_fill(buffer, abs(check), bytes_read);
-                                //printf("buffer apos o fill = \n");
-                                //for (int i = 0; i < bytes_read; i++) {
-                                //        printf("%x", buffer[i]);
-                                //}
-                                //preencher byte com BYTE_FILL
-                                //
-                                check = verifica_byte_proibido(buffer, abs(check) + 2, bytes_read);
-                        }
-                        if (bytes_proibidos > 0) {
-                                fseek(arq, -bytes_proibidos, SEEK_CUR);
-                        } // Volta o leitor do arquivo pois os ultimos bytes da mensagem foram "empurrados pra fora do buffer"
+			//check = trata_byte_proibido(buffer, &bytes_read);
+			
+			//if(check > 0)
+			//	fseek(arq, -check, SEEK_CUR);
 
-                        window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
-                        printf("Mensagem %d gerada\n", window[i].seq);
-                        printFrame(window[i]);
-                        seq++;
-                        checkpoint_i = i;
-                }
+			
+			/*while (check < 0) {
+				bytes_proibidos++;
+				//printf("byte(%d) = %c proibido\n", abs(check), buffer[abs(check)]);
+				//printf("buffer antes do fill = \n");
+				//for (int i = 0; i < bytes_read; i++) {
+				//        printf("%x", buffer[i]);
+				//}
+				shift_bytes_fill(buffer, abs(check), bytes_read);
+				//printf("buffer apos o fill = \n");
+				//for (int i = 0; i < bytes_read; i++) {
+				//        printf("%x", buffer[i]);
+				//}
+				//preencher byte com BYTE_FILL
+				//
+				check = verifica_byte_proibido(buffer, abs(check) + 2, bytes_read);
+			}
+			if (bytes_proibidos > 0) {
+				fseek(arq, -bytes_proibidos, SEEK_CUR);
+			} // Volta o leitor do arquivo pois os ultimos bytes da mensagem foram "empurrados pra fora do buffer"*/
 
-                /* Significa que você não completou a janela mas fechou o arquivo, então, da pra enviar FIM_TX na janela*/
-                if (checkpoint_i < 4) {
-                        printf("Cenário de Fim TX\n");
-                        checkpoint_i++;
-                        window[checkpoint_i] = gerar_mensagem_fim_tx(seq);
-                        printf("======ENVIANDO O FIM DA TX=======\n");
-                        msg_over = 1;
-                        end_operation = 1;
-                }
+			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
+			printf("Mensagem %d gerada\n", window[i].seq);
+			printFrame(window[i]);
+			seq++;
+			checkpoint_i = i;
+		}
 
-                //Envia as mensagens da janela 
-                for (int i = 0; i < checkpoint_i + 1; ++i) {
-                        printf("Enviando mensagens janela\n");
-                        sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
-                }
+		/* Significa que você não completou a janela mas fechou o arquivo, então, da pra enviar FIM_TX na janela*/
+		if (checkpoint_i < 4) {
+			printf("Cenário de Fim TX\n");
+			checkpoint_i++;
+			window[checkpoint_i] = gerar_mensagem_fim_tx(seq);
+			printf("======ENVIANDO O FIM DA TX=======\n");
+			msg_over = 1;
+			end_operation = 1;
+		}
+
+		//Envia as mensagens da janela 
+		for (int i = 0; i < checkpoint_i + 1; ++i) {
+			printf("Enviando mensagens janela\n");
+			sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
+		}
 
 
-                printf("Recebendo mensagens de ACK do cliente\n");
-                int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
-                if (ret < 0) {
-                        perror("Erro ao receber mensagem");
-                        close(sckt);
-                        return -1;
-                }
+		printf("Recebendo mensagens de ACK do cliente\n");
+		int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+		if (ret < 0) {
+			perror("Erro ao receber mensagem");
+			close(sckt);
+			return -1;
+		}
 
-                while(client_answer.start != START){
-                        int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
-                        if (ret < 0) {
-                                perror("Erro ao receber mensagem");
-                                close(sckt);
-                                return -1;
-                        } else {
-                                printFrame(client_answer);
-                        }
-                }
+		while(client_answer.start != START){
+			int ret = recvfrom(sckt, (char *)&client_answer, FRAME_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
+			if (ret < 0) {
+				perror("Erro ao receber mensagem");
+				close(sckt);
+				return -1;
+			} else {
+				printFrame(client_answer);
+			}
+		}
 
-                switch(client_answer.type){
-                        case ACK: 
-                                printf("Ack do cliente em %d\n",client_answer.seq);
-                                //Caso tenha acabado de ler o arquivo, marca o fim da operação
-                                if (msg_over) {
-                                        printf("Irei encerrar a operação\n");
-                                        end_operation = 1;
-                                } else {
-                                        seq = (client_answer.seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
-                                        printf("Sequencia de mensagens inicia em %d\n", seq);
-                                }
-                                break;
-                        case NACK:
-                                printf("Nack do cliente em %d\n", client_answer.seq);
-                                seq = (seq + 1) % TAM_JANELA; //Sequencia avança em +1 na janela 
-                                index_startpoint = TAM_JANELA - client_answer.seq;
-                                //Puxar mensagens nao confirmadas para o inicio do vetor
-                                printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
-                                for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
-                                        window[i-client_answer.seq] = window[i];
-                                }
-                                for(int i = 0; i < TAM_JANELA; ++i){
-                                        if(window[i].type == FIM_TX){
-                                                printf("seq de %d = %d | ", i, window[i].seq);
-                                                break;
-                                        }
-                                        printf("seq de %d = %d | ", i, window[i].seq );
-                                }
-                                printf("\n");
+		switch(client_answer.type){
+			case ACK: 
+				printf("Ack do cliente em %d\n",client_answer.seq);
+				//Caso tenha acabado de ler o arquivo, marca o fim da operação
+				if (msg_over) {
+					printf("Irei encerrar a operação\n");
+					end_operation = 1;
+				} else {
+					seq = (client_answer.seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
+					printf("Sequencia de mensagens inicia em %d\n", seq);
+				}
+				break;
+			case NACK:
+				printf("Nack do cliente em %d\n", client_answer.seq);
+				seq = (seq + 1) % TAM_JANELA; //Sequencia avança em +1 na janela 
+				index_startpoint = TAM_JANELA - client_answer.seq;
+				//Puxar mensagens nao confirmadas para o inicio do vetor
+				printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
+				for(int i = client_answer.seq; i < TAM_JANELA && client_answer.seq != 0; ++i){
+					window[i-client_answer.seq] = window[i];
+				}
+				for(int i = 0; i < TAM_JANELA; ++i){
+					if(window[i].type == FIM_TX){
+						printf("seq de %d = %d | ", i, window[i].seq);
+						break;
+					}
+					printf("seq de %d = %d | ", i, window[i].seq );
+				}
+				printf("\n");
 
-                                break;
-                }
-        }
+				break;
+		}
+	}
 
-        printf("Sai da operação, irei embora\n");
-        fclose(arq); 
+	printf("Sai da operação, irei embora\n");
+	fclose(arq); 
 
-        return 0;
+	return 0;
 }
 
 int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 
-        char nome_arquivo[64];
-        struct networkFrame window[5];
+	char nome_arquivo[64];
+	struct networkFrame window[5];
 
-        memset(window, 0, FRAME_SIZE*5);
+	memset(window, 0, FRAME_SIZE*5);
 
-        printf("Digite o nome do arquivo:\n");
-        //gets(nome_arquivo);
-        fgets(nome_arquivo, MAX_DATA_LENGHT, stdin);
-        printf("%s", nome_arquivo);
-        //for(int i=0; i < strlen(nome_arquivo); ++i){
-        //        printf("%d = %c\n", i, nome_arquivo[i]);
-        //}
-        if(nome_arquivo[strlen(nome_arquivo)-1] == '\n'){
-                nome_arquivo[strlen(nome_arquivo)-1] = '\0';
-        }
+	printf("Digite o nome do arquivo:\n");
+	//gets(nome_arquivo);
+	fgets(nome_arquivo, MAX_DATA_LENGHT, stdin);
+	printf("%s", nome_arquivo);
+	//for(int i=0; i < strlen(nome_arquivo); ++i){
+	//        printf("%d = %c\n", i, nome_arquivo[i]);
+	//}
+	if(nome_arquivo[strlen(nome_arquivo)-1] == '\n'){
+		nome_arquivo[strlen(nome_arquivo)-1] = '\0';
+	}
 
-        //for(int i=0; i < strlen(nome_arquivo); ++i){
-        //        printf("%d = %c\n", i, nome_arquivo[i]);
-        //}
+	//for(int i=0; i < strlen(nome_arquivo); ++i){
+	//        printf("%d = %c\n", i, nome_arquivo[i]);
+	//}
 
-        //printf("%s", nome_arquivo);
-        int seq = 0;
+	//printf("%s", nome_arquivo);
+	int seq = 0;
 
-        struct networkFrame message = gerar_mensagem_baixar(seq, nome_arquivo, strlen(nome_arquivo));
+	struct networkFrame message = gerar_mensagem_baixar(seq, nome_arquivo, strlen(nome_arquivo));
 
-        if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
-                printf("MENSAGEM BAIXAR ENVIADA, AGUARDANDO SERVIDOR\n");
-        }
+	if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+		printf("MENSAGEM BAIXAR ENVIADA, AGUARDANDO SERVIDOR\n");
+	}
 
-        if(!reenvia_ate_ACK(sckt, message, server_addr)){
-                return 1;
-        }
+	if(!reenvia_ate_ACK(sckt, message, server_addr)){
+		return 1;
+	}
 
-        struct networkFrame received;
-        socklen_t add_len = sizeof(struct sockaddr_ll);
+	struct networkFrame received;
+	socklen_t add_len = sizeof(struct sockaddr_ll);
 
-        int rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-        if (rec < 0) {
-                perror("Erro ao receber mensagem");
-                close(sckt);
-                /* Caso de NACK*/
-                return -1;
-        } else {
-                printf("recebida a primeira mensagem do baixar\n");
-                printFrame(received);
-        }
+	int rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+	if (rec < 0) {
+		perror("Erro ao receber mensagem");
+		close(sckt);
+		/* Caso de NACK*/
+		return -1;
+	} else {
+		printf("recebida a primeira mensagem do baixar\n");
+		printFrame(received);
+	}
 
-        while(received.start != START){
-                rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                if (rec < 0) {
-                        perror("Erro ao receber mensagem");
-                        close(sckt);
-                        /* Caso de NACK*/
-                        return -1;
-                } else {
-                        printf("recebida a primeira mensagem do baixar\n");
-                        printFrame(received);
-                }
-        }
+	while(received.start != START){
+		rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+		if (rec < 0) {
+			perror("Erro ao receber mensagem");
+			close(sckt);
+			/* Caso de NACK*/
+			return -1;
+		} else {
+			printf("recebida a primeira mensagem do baixar\n");
+			printFrame(received);
+		}
+	}
 
-        unsigned long int file_size = atol((char*)message.data+4);
+	unsigned long int file_size = atol((char*)message.data+4);
 
-        if (!ha_espaco(file_size)) {
-                char err_buff[13];
-                printf("Erro: Disco Cheio\n");
-                snprintf(err_buff, 13,"Disco cheio\n");
-                message = gerar_mensagem_erro(0, err_buff);
-                sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr));
-                return 1;
-        } else {
-                message = gerar_mensagem_resposta(0, ACK);
-                sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr));
-        }
+	if (!ha_espaco(file_size)) {
+		char err_buff[13];
+		printf("Erro: Disco Cheio\n");
+		snprintf(err_buff, 13,"Disco cheio\n");
+		message = gerar_mensagem_erro(0, err_buff);
+		sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		return 1;
+	} else {
+		message = gerar_mensagem_resposta(0, ACK);
+		sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr));
+	}
 
-        char stats_arq[25];
-        memcpy(stats_arq, message.data, 25);
+	char stats_arq[25];
+	memcpy(stats_arq, message.data, 25);
 
-        FILE *baixado = fopen(nome_arquivo, "wb+");
-        int count = 1;
-        int seq_failure = 0;
-        int seq_checkpoint = TAM_JANELA - 1;
-        int has_failures = 0; 
-        int index_failure = TAM_JANELA;
-        int fim_op = 0;
+	FILE *baixado = fopen(nome_arquivo, "wb+");
+	int count = 1;
+	int seq_failure = 0;
+	int seq_checkpoint = TAM_JANELA - 1;
+	int has_failures = 0; 
+	int index_failure = TAM_JANELA;
+	int fim_op = 0;
 
-        while (1) {
+	while (1) {
 
-                //Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
-                int received_window = 0; 
-                while(received_window < TAM_JANELA) {
+		//Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
+		int received_window = 0; 
+		while(received_window < TAM_JANELA) {
 
-                        printf("Recebendo Janelas...\n");
-                        rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
-                        if (rec < 0) {
-                                perror("Erro ao receber mensagem");
-                        } else {
-                                printf("Recebida a janela %d \n", received_window);
-                        }
+			printf("Recebendo Janelas...\n");
+			rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
+			if (rec < 0) {
+				perror("Erro ao receber mensagem");
+			} else {
+				printf("Recebida a janela %d \n", received_window);
+			}
 
-                        if(received.start == START){
-                                int seq_esperado = (seq_checkpoint + 1) % TAM_JANELA;
-                                printf("A janela %d tem o start correto\n", received.seq);
-                                if (verifica_crc8((uint8_t*)&received + 1, sizeof(received) - 2, received.crc8)) {
-                                        seq_checkpoint = received.seq;
-                                } else {
-                                        has_failures = 1;
-                                        seq_failure = (seq_checkpoint + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
-                                        index_failure = received_window;
-                                        printf("A janela %d tem erro\n", received_window);
-                                        break;
-                                }
+			if(received.start == START){
+				int seq_esperado = (seq_checkpoint + 1) % TAM_JANELA;
+				printf("A janela %d tem o start correto\n", received.seq);
+				if (verifica_crc8((uint8_t*)&received + 1, sizeof(received) - 2, received.crc8)) {
+					seq_checkpoint = received.seq;
+				} else {
+					has_failures = 1;
+					seq_failure = (seq_checkpoint + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
+					index_failure = received_window;
+					printf("A janela %d tem erro\n", received_window);
+					break;
+				}
 
-                                /* Significa que uma mensagem da sequencia deu problem na hora do envio (sequencia esta fora de ordem) */
-                                //if (seq_checkpoint != seq_esperado){
-                                //        has_failures = 1;
-                                //        seq_failure = (seq_esperado + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
-                                //        index_failure = received_window;
-                                //        printf("Problema na hora do envio (seq fora de ordem: %d recebido e %d esperado - seq_checkpoint %d) \n", window[received_window].seq, (seq_checkpoint + 1) % TAM_JANELA, seq_checkpoint);
-                                //        break;
-                                //}
+				/* Significa que uma mensagem da sequencia deu problem na hora do envio (sequencia esta fora de ordem) */
+				//if (seq_checkpoint != seq_esperado){
+				//        has_failures = 1;
+				//        seq_failure = (seq_esperado + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
+				//        index_failure = received_window;
+				//        printf("Problema na hora do envio (seq fora de ordem: %d recebido e %d esperado - seq_checkpoint %d) \n", window[received_window].seq, (seq_checkpoint + 1) % TAM_JANELA, seq_checkpoint);
+				//        break;
+				//}
 
-                                printf("Janela %d esta correta , RW %d\n", received.seq, received_window);
+				printf("Janela %d esta correta , RW %d\n", received.seq, received_window);
 
-                                memcpy(&window[received_window], &received, FRAME_SIZE);
-                                received_window++; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
+				memcpy(&window[received_window], &received, FRAME_SIZE);
+				received_window++; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
 
-                                if(received.type == FIM_TX){
-                                        printf("Recebi um fim TX na janela\n");
-                                        break;
+				if(received.type == FIM_TX){
+					printf("Recebi um fim TX na janela\n");
+					break;
 
-                                }
+				}
 
-                        }               
-                }
+			}               
+		}
 
-                for(int i = 0; i < received_window+1 && i < index_failure; ++i) {
-                        if (window[i].type == DADOS) {
-                                int removed_bytes = remove_fill_bytes((char *)window[i].data, window[i].size);
-                                printf("Baixando(%d)...\n", count++);
-                                printFrame(window[i]);
-                                fwrite(window[i].data, sizeof(char), window[i].size - removed_bytes, baixado);
+		for(int i = 0; i < received_window+1 && i < index_failure; ++i) {
+			if (window[i].type == DADOS) {
+				printFrame(window[i]);
+				size_t real_tam = remove_fill_bytes((char *)window[i].data, window[i].size);
+				printf("Baixando(%d)...\n", count++);
+				printFrame(window[i]);
+				fwrite(window[i].data, sizeof(char), real_tam, baixado);
 
-                        }
-                        if (window[i].type == FIM_TX) {
-                                fim_op = 1;
-                                printf("A janela %d contem o FIM TX\n", i);
-                        }
-                }
+			}
+			if (window[i].type == FIM_TX) {
+				fim_op = 1;
+				printf("A janela %d contem o FIM TX\n", i);
+			}
+		}
 
-                struct networkFrame answer; 
-                if (has_failures) {
-                        printf("Enviando NACK em %d\n", seq_failure);
-                        answer = gerar_mensagem_resposta(seq_failure, NACK);
-                } else {
-                        printf("Não houve erro, gerando mensagem de resposta");
-                        answer = gerar_mensagem_resposta(seq_checkpoint, ACK);
-                }
+		struct networkFrame answer; 
+		if (has_failures) {
+			printf("Enviando NACK em %d\n", seq_failure);
+			answer = gerar_mensagem_resposta(seq_failure, NACK);
+		} else {
+			printf("Não houve erro, gerando mensagem de resposta");
+			answer = gerar_mensagem_resposta(seq_checkpoint, ACK);
+		}
 
-                if (sendto_verify(sckt, (char*)&answer, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
-                        //printFrame(answer);
-                        //printf("Resposta %d enviada", answer.type);
-                }
+		if (sendto_verify(sckt, (char*)&answer, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+			//printFrame(answer);
+			//printf("Resposta %d enviada", answer.type);
+		}
 
-                //printf("%d\n", fim_op);
-                if (fim_op) {
-                        break;
-                }
+		//printf("%d\n", fim_op);
+		if (fim_op) {
+			break;
+		}
 
-                //Ler todas as mensagens na janela
-                //Verificar se tem mensagens certas/Erradas
-                //Enviar ACK/NACK 
-                //Escrever o que da pra escrever
-                //Repetir até FIM_TX
+		//Ler todas as mensagens na janela
+		//Verificar se tem mensagens certas/Erradas
+		//Enviar ACK/NACK 
+		//Escrever o que da pra escrever
+		//Repetir até FIM_TX
 
-        } 
+	} 
 
-        //printf("Recebeu o FIM_TX, fechando o arquivo ....n");
-        fclose(baixado);
-        //desempacotar_info_stat(stats_arq, nome_arquivo);
+	//printf("Recebeu o FIM_TX, fechando o arquivo ....n");
+	fclose(baixado);
+	//desempacotar_info_stat(stats_arq, nome_arquivo);
 
-        //Enviando ack
-        /*message = gerar_mensagem_ack(seq++);
+	//Enviando ack
+	/*message = gerar_mensagem_ack(seq++);
 
-          if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
-          printFrame(message);
-          printf("Ack enviado");
-          }*/
-        //printFrame(received);
+	  if (sendto_verify(sckt, (char*)&message, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+	  printFrame(message);
+	  printf("Ack enviado");
+	  }*/
+	//printFrame(received);
 
-        return 0;
+	return 0;
 }
