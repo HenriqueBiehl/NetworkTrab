@@ -651,6 +651,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 	int seq = 0;              //Indica o número da sequencia de msgs na janela
 
 	printf("Iniciando operação das janelas deslizantes\n");
+	int count = 0; 
 	while(!end_operation) {
 
 		int check;
@@ -662,10 +663,10 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
 			printFrame(window[i]);
 
-			check = trata_byte_proibido(buffer, &bytes_read);
+			//check = trata_byte_proibido(buffer, &bytes_read);
 			
-			if(check > 0)
-				fseek(arq, -check, SEEK_CUR);
+			//if(check > 0)
+			//	fseek(arq, -check, SEEK_CUR);
 
 			
 			/*while (check < 0) {
@@ -707,6 +708,8 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 
 		//Envia as mensagens da janela 
 		for (int i = 0; i < checkpoint_i + 1; ++i) {
+			printf("Enviando %d\n", count);
+			count++;
 			printf("Enviando mensagens janela\n");
 			sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 		}
@@ -908,13 +911,13 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 			}               
 		}
 
-		for(int i = 0; i < received_window+1 && i < index_failure; ++i) {
+		for(int i = 0; i < received_window + 1 && i < index_failure; ++i) {
 			if (window[i].type == DADOS) {
 				printFrame(window[i]);
-				size_t real_tam = remove_fill_bytes((char *)window[i].data, window[i].size);
+				//size_t real_tam = remove_fill_bytes((char *)window[i].data, window[i].size);
 				printf("Baixando(%d)...\n", count++);
 				printFrame(window[i]);
-				fwrite(window[i].data, sizeof(char), real_tam, baixado);
+				fwrite(window[i].data, sizeof(char), window[i].size, baixado);
 
 			}
 			if (window[i].type == FIM_TX) {
