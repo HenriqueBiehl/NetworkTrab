@@ -163,10 +163,10 @@ void shift_bytes_fill(char *buffer, size_t inicio, size_t tamanho) {
         printf("\n>>>>> char inicio = %c\n", buffer[inicio]);
 }
 
-void shift_left_bytes(char *buffer, size_t tamanho, size_t index){
+void shift_bytes_left(char *buffer, size_t tamanho, size_t index){
 	
 	for(int i = index + 1; i < tamanho - 1; ++i){
-		b[i] = b[i+1]; 
+		buffer[i] = buffer[i+1]; 
 	}
 }
 
@@ -264,8 +264,8 @@ size_t remove_fill_bytes(char *buffer, size_t tamanho) {
     //     write_index++;
     // }
 	*/
-    return bytes_removed; // Retorna o número de bytes removidos
-}
+    //return bytes_removed; // Retorna o número de bytes removidos
+//}
 
 
 int client_listar(int sckt, struct sockaddr_ll server_addr) {
