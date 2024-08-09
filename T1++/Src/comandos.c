@@ -854,12 +854,12 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 	int seq_checkpoint = TAM_JANELA - 1;
 	int has_failures = 0; 
 	int fim_op = 0;
-	int received_window = 0;
 
 	while (!fim_op) {
 
 		//Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
 		has_failures = 0; 
+		int received_window = 0;
 		while(received_window < TAM_JANELA && received.type != FIM_TX) {
 
 			//printf("Recebendo Janelas...\n");
