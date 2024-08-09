@@ -692,7 +692,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
 			//printf("Mensagem %d gerada\n", window[i].seq);
 			//printFrame(window[i]);
-			seq++;
+			seq = (seq + 1) % TAM_JANELA;
 			checkpoint_i = i;
 		}
 
@@ -743,12 +743,14 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 					end_operation = 1;
 				} else {
 					seq = (client_answer.seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
-					//printf("Sequencia de mensagens inicia em %d\n", seq);
+					printf("Em ACK a Sequencia de mensagens inicia em %d\n", seq);
 				}
 				break;
 			case NACK:
 				//printf("Nack do cliente em %d\n", client_answer.seq);
 				seq = (seq + 1) % TAM_JANELA; //Sequencia avança em +1 na janela 
+				printf("NACK a sequencia avança para %d\n", seq);
+	
 				index_startpoint = TAM_JANELA - client_answer.seq;
 				//Puxar mensagens nao confirmadas para o inicio do vetor
 				//printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
