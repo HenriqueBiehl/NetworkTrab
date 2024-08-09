@@ -649,7 +649,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 	int end_operation = 0;    //Flag que indica fim da operaçao de envio de arquivos
 	int index_startpoint = 0; //Indica o ponto de inicio para o indice da janela deslizante
 	int seq = 0;              //Indica o número da sequencia de msgs na janela
-
+	int send_index = 0;
 	//printf("Iniciando operação das janelas deslizantes\n");
 	int count = 0; 
 	size_t full_arq = 0;
@@ -661,36 +661,6 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 			bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
 			full_arq += bytes_read; 
 			printf("full arq = %ld \n", full_arq);
-			int bytes_proibidos = 0;
-			//printf("mensagem antes de fazer o fill:\n");
-			//window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
-			//printFrame(window[i]);
-
-			//check = trata_byte_proibido(buffer, &bytes_read);
-			
-			//if(check > 0)
-			//	fseek(arq, -check, SEEK_CUR);
-
-			
-			/*while (check < 0) {
-				bytes_proibidos++;
-				//printf("byte(%d) = %c proibido\n", abs(check), buffer[abs(check)]);
-				//printf("buffer antes do fill = \n");
-				//for (int i = 0; i < bytes_read; i++) {
-				//        printf("%x", buffer[i]);
-				//}
-				shift_bytes_fill(buffer, abs(check), bytes_read);
-				//printf("buffer apos o fill = \n");
-				//for (int i = 0; i < bytes_read; i++) {
-				//        printf("%x", buffer[i]);
-				//}
-				//preencher byte com BYTE_FILL
-				//
-				check = verifica_byte_proibido(buffer, abs(check) + 2, bytes_read);
-			}
-			if (bytes_proibidos > 0) {
-				fseek(arq, -bytes_proibidos, SEEK_CUR);
-			} // Volta o leitor do arquivo pois os ultimos bytes da mensagem foram "empurrados pra fora do buffer"*/
 
 			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
 			//printf("Mensagem %d gerada\n", window[i].seq);
@@ -710,10 +680,10 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 		}
 
 		//Envia as mensagens da janela 
-		for (int i = index_startpoint; i < checkpoint_i + 1; ++i) {
+		for (int i = send_index; i < checkpoint_i + 1; ++i) {
 			//printf("Enviando %d\n", count);
 			count++;
-			printf("Enviando a sequencia %d do tipo %s\n", window[i].seq, window[i].type == DADOS ? "Dados" : "FIM_TX");
+			printf("Enviando a janela[%d] sequencia %d do tipo %s\n", i,  window[i].seq, window[i].type == DADOS ? "Dados" : "FIM_TX");
 			sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 		}
 
@@ -747,22 +717,27 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 				} else {
 					//seq = (seq == 0 ? 4 : seq - 1); //Avança em + 1 na janela em relação a ultima sequencia
 					printf("Em ACK a Sequencia de mensagens inicia em %d\n", seq);
-				}
 
-				int index_ack;
-				for(int i = 0;  i < TAM_JANELA; ++ i){
-					if(window[i].seq == client_answer.seq){
-						index_startpoint = TAM_JANELA - i - 1;
-						index_ack = i;
+					for(int i = 0;  i < TAM_JANELA; ++ i){
+						if(window[i].seq == client_answer.seq){
+							index_startpoint = i;
+							break;
+						}
 					}
-				}
 
-				//Puxar mensagens nao confirmadas para o inicio do vetor
-				//printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
-				for(int i = index_ack + 1 ; i < TAM_JANELA; ++i){
-					window[i- (index_ack + 1)] = window[i];
-				}
+					//Puxar mensagens nao confirmadas para o inicio do vetor
+					//printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
+					int count = 0; 
+					for(int i = index_startpoint + 1 ; i < TAM_JANELA; ++i){
+						window[i- (index_startpoint + 1)] = window[i];
+						count++;
+					}
 
+					for(int i = 0; i < count; ++i){
+							printf("window[%d] = seq %d | ", i, window[i].seq);
+							break;
+						}
+				}
 				break;
 			case NACK:
 				//printf("Nack do cliente em %d\n", client_answer.seq);
@@ -878,13 +853,12 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 	int seq_failure = 0;
 	int seq_checkpoint = TAM_JANELA - 1;
 	int has_failures = 0; 
-	int index_failure = TAM_JANELA;
 	int fim_op = 0;
+	int received_window = 0;
 
 	while (!fim_op) {
 
 		//Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
-		int received_window = 0;
 		has_failures = 0; 
 		while(received_window < TAM_JANELA && received.type != FIM_TX) {
 
@@ -904,28 +878,25 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 				} else {
 					has_failures = 1;
 					seq_failure = (seq_checkpoint + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
-					index_failure = received_window;
 					printf("A janela %d tem erro\n", seq_failure);
 					break;
 				}
 
+				if(received.seq != seq_esperado ){
+					has_failures = 1; 
+					seq_failure = seq_esperado;
+					printf("ERRO: Seq esperado %d, recebi %d\n", seq_esperado, received.seq);
+					break;
+				}
+
 				printf("Recebi a sequencia %d do tipo %s\n", received.seq, received.type == DADOS ? "Dados" : "FIM_TX");
-				/* Significa que uma mensagem da sequencia deu problem na hora do envio (sequencia esta fora de ordem) */
-				//if (seq_checkpoint != seq_esperado){
-				//        has_failures = 1;
-				//        seq_failure = (seq_esperado + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
-				//        index_failure = received_window;
-				//        printf("Problema na hora do envio (seq fora de ordem: %d recebido e %d esperado - seq_checkpoint %d) \n", window[received_window].seq, (seq_checkpoint + 1) % TAM_JANELA, seq_checkpoint);
-				//        break;
-				//}
 
-				//printf("Janela %d esta correta , RW %d\n", received.seq, received_window);
-
-				memcpy(&window[received_window], &received, FRAME_SIZE);
-				received_window++; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
+				//memcpy(&window[received_window], &received, FRAME_SIZE);
+				received_window = (received_window + 1)%TAM_JANELA; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
+				fwrite(received.data, sizeof(char), received.size, baixado);
 
 				if(received.type == FIM_TX){
-					//printf("Recebi um fim TX na janela\n");
+					fim_op = 1;
 					break;
 
 				}
@@ -933,7 +904,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 			}               
 		}
 
-		for(int i = 0; i < seq_checkpoint ; ++i) {
+		/*for(int i = ; i < received_window ; ++i) {
 			if (window[i].type == DADOS) {
 				//printFrame(window[i]);
 				//size_t real_tam = remove_fill_bytes((char *)window[i].data, window[i].size);
@@ -947,7 +918,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 				break;
 				printf("A janela %d contem o FIM TX\n", window[i].type);
 			}
-		}
+		}*/
 
 		struct networkFrame answer; 
 		if (has_failures) {
@@ -956,6 +927,26 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 		} else {
 			//printf("Não houve erro, gerando mensagem de resposta");
 			answer = gerar_mensagem_resposta(seq_checkpoint, ACK);
+
+			/*for(int i = 0;  i < TAM_JANELA; ++ i){
+				if(window[i].seq == seq_checkpoint){
+					received_window = (i + 1) % TAM_JANELA;
+					break;
+				}
+			}
+
+			//Puxar mensagens nao confirmadas para o inicio do vetor
+			//printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
+			int count = 0; 
+			for(int i = received_window ; i < TAM_JANELA; ++i){
+				window[i- (received_window + 1)] = window[i];
+				count++;
+			}
+
+			for(int i = 0; i < count; ++i){
+				printf("window[%d] = seq %d | ", i, window[i].seq);
+				break;
+			}*/
 		}
 
 		if (sendto_verify(sckt, (char*)&answer, FRAME_SIZE, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
