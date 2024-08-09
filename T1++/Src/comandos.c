@@ -710,7 +710,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 		}
 
 		//Envia as mensagens da janela 
-		for (int i = 0; i < checkpoint_i + 1; ++i) {
+		for (int i = index_startpoint; i < checkpoint_i + 1; ++i) {
 			//printf("Enviando %d\n", count);
 			count++;
 			printf("Enviando a sequencia %d do tipo %s\n", window[i].seq, window[i].type == DADOS ? "Dados" : "FIM_TX");
@@ -745,7 +745,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 					printf("Irei encerrar a operação\n");
 					end_operation = 1;
 				} else {
-					seq = seq == 0 ? 4 : seq - 1; //Avança em + 1 na janela em relação a ultima sequencia
+					//seq = (seq == 0 ? 4 : seq - 1); //Avança em + 1 na janela em relação a ultima sequencia
 					printf("Em ACK a Sequencia de mensagens inicia em %d\n", seq);
 				}
 
@@ -933,7 +933,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 			}               
 		}
 
-		for(int i = 0; i < received_window + 1 && i < index_failure; ++i) {
+		for(int i = 0; i < seq_checkpoint ; ++i) {
 			if (window[i].type == DADOS) {
 				//printFrame(window[i]);
 				//size_t real_tam = remove_fill_bytes((char *)window[i].data, window[i].size);
