@@ -745,9 +745,24 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 					printf("Irei encerrar a operação\n");
 					end_operation = 1;
 				} else {
-					seq = (client_answer.seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
+					seq = (seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
 					printf("Em ACK a Sequencia de mensagens inicia em %d\n", seq);
 				}
+
+				int index_ack;
+				for(int i = 0;  i < TAM_JANELA; ++ i){
+					if(window[i].seq == client_answer.seq){
+						index_startpoint = TAM_JANELA - i - 1;
+						index_ack = i;
+					}
+				}
+
+				//Puxar mensagens nao confirmadas para o inicio do vetor
+				//printf("seq nova %d // start point no vetor %d\n", seq, index_startpoint);
+				for(int i = index_ack + 1 ; i < TAM_JANELA; ++i){
+					window[i- (index_ack + 1)] = window[i];
+				}
+
 				break;
 			case NACK:
 				//printf("Nack do cliente em %d\n", client_answer.seq);
