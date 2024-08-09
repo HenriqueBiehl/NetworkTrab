@@ -710,7 +710,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 		for (int i = 0; i < checkpoint_i + 1; ++i) {
 			//printf("Enviando %d\n", count);
 			count++;
-			printf("Enviando mensagens janela %d\n", window[i].seq);
+			printf("Enviando a sequencia %d do tipo %s\n", window[i].seq, window[i].type == DADOS ? "Dados" : "FIM_TX");
 			sendto_verify(sckt, (char*)&window[i], FRAME_SIZE, (struct sockaddr *)&client_addr, sizeof(client_addr));
 		}
 
