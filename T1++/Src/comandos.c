@@ -864,8 +864,9 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 	while (1) {
 
 		//Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
-		int received_window = 0; 
-		while(received_window < TAM_JANELA) {
+		int received_window = 0;
+		has_failures = 0; 
+		while(received_window < TAM_JANELA && received.type == FIM_TX) {
 
 			//printf("Recebendo Janelas...\n");
 			rec = recvfrom(sckt, (char*)&received, FRAME_SIZE, 0, (struct sockaddr *)&server_addr, &add_len);
@@ -884,10 +885,11 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 					has_failures = 1;
 					seq_failure = (seq_checkpoint + 1) % TAM_JANELA; //Se deu falha, você nao garante que o dado de seq esta inteiro.
 					index_failure = received_window;
-					//printf("A janela %d tem erro\n", received_window);
+					printf("A janela %d tem erro\n", seq_failure);
 					break;
 				}
 
+				printf("Recebi a sequencia %d do tipo %s\n", received.seq, received.type == DADOS ? "Dados" : "FIM_TX");
 				/* Significa que uma mensagem da sequencia deu problem na hora do envio (sequencia esta fora de ordem) */
 				//if (seq_checkpoint != seq_esperado){
 				//        has_failures = 1;
@@ -922,7 +924,8 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 			}
 			if (window[i].type == FIM_TX) {
 				fim_op = 1;
-				//printf("A janela %d contem o FIM TX\n", i);
+				break;
+				printf("A janela %d contem o FIM TX\n", window[i].type);
 			}
 		}
 
