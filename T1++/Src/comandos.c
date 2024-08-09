@@ -861,7 +861,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 	int index_failure = TAM_JANELA;
 	int fim_op = 0;
 
-	while (1) {
+	while (!fim_op) {
 
 		//Processar que nem sempre quem ele vai receber é de fato uma mensagem nova
 		int received_window = 0;
