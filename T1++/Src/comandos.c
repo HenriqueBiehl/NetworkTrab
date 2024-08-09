@@ -892,7 +892,7 @@ int client_baixar_janela_deslizante(int sckt, struct sockaddr_ll server_addr) {
 				printf("Recebi a sequencia %d do tipo %s\n", received.seq, received.type == DADOS ? "Dados" : "FIM_TX");
 
 				//memcpy(&window[received_window], &received, FRAME_SIZE);
-				received_window = (received_window + 1)%TAM_JANELA; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
+				received_window++ ; //Diz quandos elementos vc recebeu na janela, serve como indice para a janela
 				fwrite(received.data, sizeof(char), received.size, baixado);
 
 				if(received.type == FIM_TX){
