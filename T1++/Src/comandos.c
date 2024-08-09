@@ -652,12 +652,15 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 
 	//printf("Iniciando operação das janelas deslizantes\n");
 	int count = 0; 
+	size_t full_arq = 0;
 	while(!end_operation) {
 
 		int check;
 		checkpoint_i = index_startpoint;
 		for(int i = index_startpoint; i < TAM_JANELA && !feof(arq); i++){
 			bytes_read = fread(buffer, sizeof(char), MAX_DATA_LENGHT, arq);
+			full_arq += bytes_read; 
+			printf("full arq = %ld \n", full_arq);
 			int bytes_proibidos = 0;
 			//printf("mensagem antes de fazer o fill:\n");
 			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
