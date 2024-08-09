@@ -663,7 +663,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 			printf("full arq = %ld \n", full_arq);
 			int bytes_proibidos = 0;
 			//printf("mensagem antes de fazer o fill:\n");
-			window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
+			//window[i] = gerar_mensagem_dados(seq, buffer, bytes_read);
 			//printFrame(window[i]);
 
 			//check = trata_byte_proibido(buffer, &bytes_read);
@@ -745,7 +745,7 @@ int server_baixar_janela_deslizante(int sckt, struct sockaddr_ll client_addr, st
 					printf("Irei encerrar a operação\n");
 					end_operation = 1;
 				} else {
-					seq = (seq + 1)%TAM_JANELA; //Avança em + 1 na janela em relação a ultima sequencia
+					seq = seq == 0 ? 4 : seq - 1; //Avança em + 1 na janela em relação a ultima sequencia
 					printf("Em ACK a Sequencia de mensagens inicia em %d\n", seq);
 				}
 
